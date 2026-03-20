@@ -10,6 +10,7 @@ public class DarudeMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		DarudeBlocks.initialize();
 		LOGGER.info("Darude initialized: sandstorms, renewable sand and sand layers");
 	}
 }
