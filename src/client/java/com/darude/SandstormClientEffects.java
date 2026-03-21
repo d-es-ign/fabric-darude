@@ -17,8 +17,8 @@ public final class SandstormClientEffects {
 	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(0xD8C48C, 1.0f);
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
-	private static final int BASE_PARTICLE_INTERVAL_TICKS = 2;
-	private static final int BASE_MAX_PARTICLES_PER_TICK = 60;
+	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
+	private static final int BASE_MAX_PARTICLES_PER_TICK = 48;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 	private static Direction windDirection = Direction.NORTH;
 	private static Direction previousWindDirection = Direction.NORTH;
@@ -60,7 +60,7 @@ public final class SandstormClientEffects {
 		}
 
 		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier);
-		particleCount = Math.min(particleCount, BASE_MAX_PARTICLES_PER_TICK);
+		particleCount = Math.min(particleCount, tuning.maxPerTick);
 		if (particleCount <= 0) {
 			return;
 		}
@@ -123,18 +123,18 @@ public final class SandstormClientEffects {
 		if (mode instanceof Enum<?> modeEnum) {
 			String name = modeEnum.name();
 			if ("MINIMAL".equals(name)) {
-				return new ParticleTuning(0.2f, BASE_PARTICLE_INTERVAL_TICKS * 3);
+				return new ParticleTuning(0.2f, BASE_PARTICLE_INTERVAL_TICKS * 3, 12);
 			}
 
 			if ("DECREASED".equals(name)) {
-				return new ParticleTuning(0.5f, BASE_PARTICLE_INTERVAL_TICKS * 2);
+				return new ParticleTuning(0.5f, BASE_PARTICLE_INTERVAL_TICKS * 2, 24);
 			}
 		}
 
-		return new ParticleTuning(1.0f, BASE_PARTICLE_INTERVAL_TICKS);
+		return new ParticleTuning(1.0f, BASE_PARTICLE_INTERVAL_TICKS, BASE_MAX_PARTICLES_PER_TICK);
 	}
 
-	private record ParticleTuning(float densityMultiplier, int intervalTicks) {
+	private record ParticleTuning(float densityMultiplier, int intervalTicks, int maxPerTick) {
 	}
 
 	private static void syncWindWorld(ClientWorld world) {

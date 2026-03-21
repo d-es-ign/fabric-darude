@@ -63,6 +63,12 @@ public final class SandLayerGenerationConfig {
 					int nearDesertMaxLayers = root.has("near_desert_max_layers")
 						? root.get("near_desert_max_layers").getAsInt()
 						: defaults.nearDesertMaxLayers();
+					int nearDesertColumnSampleNumerator = root.has("near_desert_column_sample_numerator")
+						? root.get("near_desert_column_sample_numerator").getAsInt()
+						: defaults.nearDesertColumnSampleNumerator();
+					int nearDesertColumnSampleDenominator = root.has("near_desert_column_sample_denominator")
+						? root.get("near_desert_column_sample_denominator").getAsInt()
+						: defaults.nearDesertColumnSampleDenominator();
 					String nearDesertSpawnableSupportMode = root.has("near_desert_spawnable_support_mode")
 						? root.get("near_desert_spawnable_support_mode").getAsString()
 						: defaults.nearDesertSpawnableSupportMode();
@@ -73,6 +79,8 @@ public final class SandLayerGenerationConfig {
 					nearDesertValidSpotChance = clamp(nearDesertValidSpotChance, 0.0f, 1.0f);
 					nearDesertMinLayers = clamp(nearDesertMinLayers, 0, 15);
 					nearDesertMaxLayers = clamp(nearDesertMaxLayers, 0, 15);
+					nearDesertColumnSampleDenominator = clamp(nearDesertColumnSampleDenominator, 1, 32);
+					nearDesertColumnSampleNumerator = clamp(nearDesertColumnSampleNumerator, 0, nearDesertColumnSampleDenominator);
 					if (nearDesertMinLayers > nearDesertMaxLayers) {
 						int swap = nearDesertMinLayers;
 						nearDesertMinLayers = nearDesertMaxLayers;
@@ -89,6 +97,8 @@ public final class SandLayerGenerationConfig {
 						nearDesertValidSpotChance,
 						nearDesertMinLayers,
 						nearDesertMaxLayers,
+						nearDesertColumnSampleNumerator,
+						nearDesertColumnSampleDenominator,
 						nearDesertSpawnableSupportMode
 					);
 				} catch (Exception e) {
@@ -114,10 +124,12 @@ public final class SandLayerGenerationConfig {
 		float nearDesertValidSpotChance,
 		int nearDesertMinLayers,
 		int nearDesertMaxLayers,
+		int nearDesertColumnSampleNumerator,
+		int nearDesertColumnSampleDenominator,
 		String nearDesertSpawnableSupportMode
 	) {
 		public static Values defaults() {
-			return new Values(0.3f, 4, 2, 0.2f, 0, 2, "full_block");
+			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 6, 8, "full_block");
 		}
 	}
 }

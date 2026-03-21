@@ -5,5 +5,7 @@
   "near_desert_valid_spot_chance": 0.2,
   "near_desert_min_layers": 0,
   "near_desert_max_layers": 2,
+  "near_desert_column_sample_numerator": 6,
+  "near_desert_column_sample_denominator": 8,
   "near_desert_spawnable_support_mode": "full_block"
 }

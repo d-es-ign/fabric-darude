@@ -29,8 +29,10 @@ public final class SandLayerChunkGeneration {
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_SUPPORT = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_support"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
 	private static final ConcurrentHashMap<Integer, int[][]> CIRCLE_OFFSETS_CACHE = new ConcurrentHashMap<>();
-	private static final int NEAR_DESERT_COLUMN_SAMPLE_DENOMINATOR = 8;
-	private static final int NEAR_DESERT_COLUMN_SAMPLE_NUMERATOR = 6;
+	private static final int[][] QUICK_CHECK_DIRECTIONS = new int[][]{
+		{1, 0}, {-1, 0}, {0, 1}, {0, -1},
+		{1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+	};
 
 	private SandLayerChunkGeneration() {
 	}
@@ -102,7 +104,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (!shouldSampleNearDesertColumn(chunkPos, localX, localZ)) {
+				if (!shouldSampleNearDesertColumn(chunkPos, localX, localZ, config.nearDesertColumnSampleNumerator(), config.nearDesertColumnSampleDenominator())) {
 					continue;
 				}
 
@@ -164,7 +166,8 @@ public final class SandLayerChunkGeneration {
 			return false;
 		}
 
-		BlockState topSurfaceState = world.getBlockState(new BlockPos(x, topSurfaceY, z));
+		BlockPos.Mutable mutablePos = new BlockPos.Mutable(x, topSurfaceY, z);
+		BlockState topSurfaceState = world.getBlockState(mutablePos);
 		if (!topSurfaceState.isIn(BlockTags.LEAVES)) {
 			return false;
 		}
@@ -198,6 +201,16 @@ public final class SandLayerChunkGeneration {
 		int centerZ = pos.getZ();
 		int[][] biomeOffsets = getCircleOffsets(distance, false);
 		int[][] sandOffsets = getCircleOffsets(distance + 2, true);
+		int quickDistance = Math.max(1, distance);
+		int quickSandDistance = quickDistance + 2;
+
+		if (!hasNearbyDesertBiomeQuick(world, centerX, centerY, centerZ, quickDistance, mutablePos, chunkAvailabilityCache)) {
+			return false;
+		}
+
+		if (hasNearbySandQuick(world, centerX, centerZ, quickSandDistance, mutablePos, chunkAvailabilityCache, topYNoLeavesCache)) {
+			return true;
+		}
 
 		boolean nearDesertBiome = false;
 
@@ -222,6 +235,61 @@ public final class SandLayerChunkGeneration {
 		for (int[] offset : sandOffsets) {
 			int checkX = centerX + offset[0];
 			int checkZ = centerZ + offset[1];
+			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
+				continue;
+			}
+
+			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
+			if (checkY < world.getBottomY() || checkY > world.getTopYInclusive()) {
+				continue;
+			}
+
+			mutablePos.set(checkX, checkY, checkZ);
+			if (world.getBlockState(mutablePos).isOf(Blocks.SAND)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean hasNearbyDesertBiomeQuick(
+		ServerWorld world,
+		int centerX,
+		int centerY,
+		int centerZ,
+		int distance,
+		BlockPos.Mutable mutablePos,
+		Map<Long, Boolean> chunkAvailabilityCache
+	) {
+		for (int[] direction : QUICK_CHECK_DIRECTIONS) {
+			int checkX = centerX + direction[0] * distance;
+			int checkZ = centerZ + direction[1] * distance;
+			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
+				continue;
+			}
+
+			mutablePos.set(checkX, centerY, checkZ);
+			if (world.getBiome(mutablePos).isIn(SANDSTORM_BIOMES)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean hasNearbySandQuick(
+		ServerWorld world,
+		int centerX,
+		int centerZ,
+		int distance,
+		BlockPos.Mutable mutablePos,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache
+	) {
+		for (int[] direction : QUICK_CHECK_DIRECTIONS) {
+			int checkX = centerX + direction[0] * distance;
+			int checkZ = centerZ + direction[1] * distance;
 			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
 				continue;
 			}
@@ -302,9 +370,17 @@ public final class SandLayerChunkGeneration {
 		return topY;
 	}
 
-	private static boolean shouldSampleNearDesertColumn(ChunkPos chunkPos, int localX, int localZ) {
+	private static boolean shouldSampleNearDesertColumn(ChunkPos chunkPos, int localX, int localZ, int numerator, int denominator) {
+		if (numerator <= 0) {
+			return false;
+		}
+
+		if (numerator >= denominator) {
+			return true;
+		}
+
 		int hash = (int) (chunkPos.toLong() ^ (localX * 73428767L) ^ (localZ * 912931L));
-		int bucket = Math.floorMod(hash, NEAR_DESERT_COLUMN_SAMPLE_DENOMINATOR);
-		return bucket < NEAR_DESERT_COLUMN_SAMPLE_NUMERATOR;
+		int bucket = Math.floorMod(hash, denominator);
+		return bucket < numerator;
 	}
 }
