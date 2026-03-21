@@ -69,7 +69,7 @@ public final class SandLayerGenerationConfig {
 
 					validSpotChance = clamp(validSpotChance, 0.0f, 1.0f);
 					baseMaxLayers = clamp(baseMaxLayers, 0, 15);
-					nearDesertDistance = clamp(nearDesertDistance, 0, 16);
+					nearDesertDistance = clamp(nearDesertDistance, 0, 6);
 					nearDesertValidSpotChance = clamp(nearDesertValidSpotChance, 0.0f, 1.0f);
 					nearDesertMinLayers = clamp(nearDesertMinLayers, 0, 15);
 					nearDesertMaxLayers = clamp(nearDesertMaxLayers, 0, 15);
