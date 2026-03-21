@@ -71,7 +71,7 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos);
+					int surroundingFullBlocks = countHorizontalFullBlocks(world, chunkPos, placementPos);
 					int minimumLayers = surroundingFullBlocks / 2;
 					int maximumLayers = config.baseMaxLayers();
 
@@ -92,7 +92,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance())) {
+				if (!isNearDesertSand(world, chunkPos, placementPos, config.nearDesertDistance())) {
 					continue;
 				}
 
@@ -117,17 +117,27 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static void setSandLayers(ServerWorld world, BlockPos pos, int layerCount) {
-		if (layerCount >= 16) {
-			world.setBlockState(pos, Blocks.SAND.getDefaultState(), 3);
-		} else {
-			world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, layerCount), 3);
-		}
+		int clampedLayers = Math.max(1, Math.min(15, layerCount));
+		world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), 3);
 	}
 
-	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center) {
+	private static int countHorizontalFullBlocks(ServerWorld world, ChunkPos chunkPos, BlockPos center) {
 		int count = 0;
+		int minX = chunkPos.getStartX();
+		int maxX = chunkPos.getEndX();
+		int minZ = chunkPos.getStartZ();
+		int maxZ = chunkPos.getEndZ();
+		int y = center.getY();
 		for (Direction direction : Direction.Type.HORIZONTAL) {
 			BlockPos neighborPos = center.offset(direction);
+			if (neighborPos.getX() < minX || neighborPos.getX() > maxX || neighborPos.getZ() < minZ || neighborPos.getZ() > maxZ) {
+				continue;
+			}
+
+			if (y < world.getBottomY() || y > world.getTopYInclusive()) {
+				continue;
+			}
+
 			BlockState state = world.getBlockState(neighborPos);
 			if (state.isOpaqueFullCube()) {
 				count++;
@@ -137,9 +147,10 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static boolean isUnderLeaves(ServerWorld world, BlockPos pos) {
+		BlockPos.Mutable mutablePos = new BlockPos.Mutable(pos.getX(), pos.getY() + 1, pos.getZ());
 		for (int y = pos.getY() + 1; y <= world.getTopYInclusive(); y++) {
-			BlockPos checkPos = new BlockPos(pos.getX(), y, pos.getZ());
-			BlockState checkState = world.getBlockState(checkPos);
+			mutablePos.setY(y);
+			BlockState checkState = world.getBlockState(mutablePos);
 			if (checkState.isAir()) {
 				continue;
 			}
@@ -158,10 +169,18 @@ public final class SandLayerChunkGeneration {
 		return state.isOpaqueFullCube();
 	}
 
-	public static boolean isNearDesertSand(ServerWorld world, BlockPos pos, int distance) {
+	public static boolean isNearDesertSand(ServerWorld world, ChunkPos chunkPos, BlockPos pos, int distance) {
 		if (world.getBiome(pos).isIn(SANDSTORM_BIOMES)) {
 			return false;
 		}
+
+		int minX = chunkPos.getStartX();
+		int maxX = chunkPos.getEndX();
+		int minZ = chunkPos.getStartZ();
+		int maxZ = chunkPos.getEndZ();
+		int minY = world.getBottomY();
+		int maxY = world.getTopYInclusive();
+		BlockPos.Mutable mutablePos = new BlockPos.Mutable();
 
 		boolean nearDesertBiome = false;
 
@@ -176,8 +195,15 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					BlockPos nearbyPos = pos.add(dx, dy, dz);
-					if (world.getBiome(nearbyPos).isIn(SANDSTORM_BIOMES)) {
+					int checkX = pos.getX() + dx;
+					int checkY = pos.getY() + dy;
+					int checkZ = pos.getZ() + dz;
+					if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
+						continue;
+					}
+
+					mutablePos.set(checkX, checkY, checkZ);
+					if (world.getBiome(mutablePos).isIn(SANDSTORM_BIOMES)) {
 						nearDesertBiome = true;
 						break;
 					}
@@ -205,7 +231,15 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					if (world.getBlockState(pos.add(dx, dy, dz)).isOf(Blocks.SAND)) {
+					int checkX = pos.getX() + dx;
+					int checkY = pos.getY() + dy;
+					int checkZ = pos.getZ() + dz;
+					if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
+						continue;
+					}
+
+					mutablePos.set(checkX, checkY, checkZ);
+					if (world.getBlockState(mutablePos).isOf(Blocks.SAND)) {
 						return true;
 					}
 				}
