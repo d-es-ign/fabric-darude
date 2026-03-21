@@ -2,7 +2,6 @@ package com.darude;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.math.BlockPos;
@@ -25,24 +24,6 @@ public final class SandstormClientEffects {
 		if (world == null || client.player == null) {
 			return;
 		}
-
-		Vec3d origin = client.player.getPos();
-		for (int i = 0; i < 12; i++) {
-			double x = origin.x + (world.random.nextDouble() - 0.5) * 28.0;
-			double y = origin.y + world.random.nextDouble() * 8.0;
-			double z = origin.z + (world.random.nextDouble() - 0.5) * 28.0;
-
-			double vx = (world.random.nextDouble() - 0.5) * 0.02;
-			double vy = -0.02 - world.random.nextDouble() * 0.02;
-			world.addParticle(x, y, z, vx, vy, ParticleTypes.WHITE_ASH);
-		}
-
-		if (world.random.nextFloat() < 0.35f) {
-			double x = origin.x + (world.random.nextDouble() - 0.5) * 24.0;
-			double y = origin.y + world.random.nextDouble() * 10.0;
-			double z = origin.z + (world.random.nextDouble() - 0.5) * 24.0;
-			world.addParticle(x, y, z, 0.0, -0.01, ParticleTypes.WHITE_ASH);
-		}
 	}
 
 	public static boolean isSandstormActive(MinecraftClient client) {
@@ -51,7 +32,11 @@ public final class SandstormClientEffects {
 			return false;
 		}
 
-		return isSandstormActive(world, client.getCameraEntity().getPos());
+		return isSandstormActive(world, new Vec3d(
+			client.getCameraEntity().getX(),
+			client.getCameraEntity().getY(),
+			client.getCameraEntity().getZ()
+		));
 	}
 
 	public static boolean isSandstormActive(ClientWorld world, Vec3d cameraPos) {
