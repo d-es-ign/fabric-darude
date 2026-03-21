@@ -34,11 +34,11 @@ public abstract class SandstormFogMixin {
 		CallbackInfoReturnable<Vector4f> cir
 	) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (!SandstormClientEffects.isSandstormActive(client)) {
+		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
+		if (transitionProgress < 0.0f) {
 			return;
 		}
 
-		float transitionProgress = SandstormClientEffects.getWindTransitionProgress(client);
 		Vector4f color = new Vector4f(cir.getReturnValue());
 		float colorScale = lerp(0.78f, 0.62f, transitionProgress);
 		cir.setReturnValue(color.mul(colorScale, colorScale * 0.92f, colorScale * 0.82f, 1.0f));
@@ -53,11 +53,11 @@ public abstract class SandstormFogMixin {
 	)
 	private float darude$clampRenderDistanceStart(float value) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (!SandstormClientEffects.isSandstormActive(client)) {
+		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
+		if (transitionProgress < 0.0f) {
 			return value;
 		}
 
-		float transitionProgress = SandstormClientEffects.getWindTransitionProgress(client);
 		float animatedFogStart = lerp(SANDSTORM_FOG_START, GUST_FOG_START, transitionProgress);
 
 		return Math.min(value, animatedFogStart);
@@ -72,11 +72,11 @@ public abstract class SandstormFogMixin {
 	)
 	private float darude$clampRenderDistanceEnd(float value) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (!SandstormClientEffects.isSandstormActive(client)) {
+		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
+		if (transitionProgress < 0.0f) {
 			return value;
 		}
 
-		float transitionProgress = SandstormClientEffects.getWindTransitionProgress(client);
 		float animatedFogEnd = lerp(SANDSTORM_FOG_END, GUST_FOG_END, transitionProgress);
 
 		return Math.min(value, animatedFogEnd);

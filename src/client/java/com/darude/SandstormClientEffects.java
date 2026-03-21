@@ -175,6 +175,14 @@ public final class SandstormClientEffects {
 		return progress;
 	}
 
+	public static float getWindTransitionProgressIfSandstormActive(MinecraftClient client) {
+		if (!isSandstormActive(client)) {
+			return -1.0f;
+		}
+
+		return getWindTransitionProgress(client);
+	}
+
 	public static boolean isSandstormActive(MinecraftClient client) {
 		ClientWorld world = client.world;
 		if (world == null || client.getCameraEntity() == null) {
