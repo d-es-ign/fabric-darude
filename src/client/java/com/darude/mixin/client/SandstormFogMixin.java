@@ -2,6 +2,9 @@ package com.darude.mixin.client;
 
 import com.darude.SandstormClientEffects;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.client.world.ClientWorld;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,7 +25,14 @@ public abstract class SandstormFogMixin {
 		cancellable = true,
 		require = 0
 	)
-	private void darude$darkenFogColor(CallbackInfoReturnable<Vector4f> cir) {
+	private void darude$darkenFogColor(
+		Camera camera,
+		int viewDistance,
+		RenderTickCounter tickCounter,
+		float skyDarkness,
+		ClientWorld clientWorld,
+		CallbackInfoReturnable<Vector4f> cir
+	) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return;
