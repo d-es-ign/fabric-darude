@@ -1,8 +1,8 @@
 package com.darude;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.particle.DustParticleEffect;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
@@ -39,7 +39,7 @@ public final class SandstormClientEffects {
 		}
 
 		Random random = world.getRandom();
-		Vec3d origin = client.player.getPos();
+		Vec3d origin = new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ());
 		updateWindDirection(world, random);
 
 		float rainGradient = world.getRainGradient(1.0f);
@@ -61,7 +61,7 @@ public final class SandstormClientEffects {
 			double vy = -0.10 - random.nextDouble() * 0.06;
 			double vz = baseVz + (random.nextDouble() - 0.5) * 0.08;
 
-			world.addParticle(SAND_DUST, x, y, z, vx, vy, vz);
+			world.addParticle(SAND_DUST, false, false, x, y, z, vx, vy, vz);
 		}
 
 		if (random.nextFloat() < 0.75f) {
@@ -71,7 +71,7 @@ public final class SandstormClientEffects {
 			double vx = baseVx * 0.65 + (random.nextDouble() - 0.5) * 0.05;
 			double vy = -0.07 - random.nextDouble() * 0.03;
 			double vz = baseVz * 0.65 + (random.nextDouble() - 0.5) * 0.05;
-			world.addParticle(ParticleTypes.WHITE_ASH, x, y, z, vx, vy, vz);
+			world.addParticle(ParticleTypes.WHITE_ASH, false, false, x, y, z, vx, vy, vz);
 		}
 	}
 
