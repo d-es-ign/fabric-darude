@@ -52,7 +52,7 @@ public final class SandLayerChunkGeneration {
 				int z = chunkPos.getStartZ() + localZ;
 				int y = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
 
-				if (y <= world.getBottomY() || y >= world.getTopYInclusive()) {
+				if (y < world.getBottomY() || y > world.getTopYInclusive()) {
 					continue;
 				}
 
