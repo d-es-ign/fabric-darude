@@ -124,7 +124,7 @@ public final class SandLayerChunkGeneration {
 
 	private static void setSandLayers(WorldChunk chunk, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
-		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), false);
+		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), 0);
 	}
 
 	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
