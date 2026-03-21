@@ -23,16 +23,22 @@ public final class SandstormClientEffects {
 	private static Direction previousWindDirection = Direction.NORTH;
 	private static long nextWindShiftTick;
 	private static long windBlendStartTick;
+	private static ClientWorld currentWindWorld;
 
 	private SandstormClientEffects() {
 	}
 
 	public static void tick(MinecraftClient client) {
+		ClientWorld world = client.world;
+		syncWindWorld(world);
+		if (world == null) {
+			return;
+		}
+
 		if (!isSandstormActive(client)) {
 			return;
 		}
 
-		ClientWorld world = client.world;
 		if (world == null || client.player == null) {
 			return;
 		}
@@ -76,6 +82,11 @@ public final class SandstormClientEffects {
 
 	private static void updateWindDirection(ClientWorld world, Random random) {
 		long gameTime = world.getTime();
+		if (gameTime < windBlendStartTick || gameTime < nextWindShiftTick - WIND_SHIFT_TICKS) {
+			windBlendStartTick = gameTime;
+			nextWindShiftTick = gameTime;
+		}
+
 		if (gameTime < nextWindShiftTick) {
 			return;
 		}
@@ -93,6 +104,25 @@ public final class SandstormClientEffects {
 
 	private static double lerp(double start, double end, float progress) {
 		return start + (end - start) * progress;
+	}
+
+	private static void syncWindWorld(ClientWorld world) {
+		if (world == currentWindWorld) {
+			return;
+		}
+
+		currentWindWorld = world;
+		windDirection = Direction.NORTH;
+		previousWindDirection = Direction.NORTH;
+		if (world == null) {
+			nextWindShiftTick = 0;
+			windBlendStartTick = 0;
+			return;
+		}
+
+		long gameTime = world.getTime();
+		nextWindShiftTick = gameTime;
+		windBlendStartTick = gameTime;
 	}
 
 	public static float getWindTransitionProgress(MinecraftClient client) {

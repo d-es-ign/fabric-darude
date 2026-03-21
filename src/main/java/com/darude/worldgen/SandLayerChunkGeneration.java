@@ -45,6 +45,7 @@ public final class SandLayerChunkGeneration {
 		ChunkPos chunkPos = chunk.getPos();
 		long seed = world.getSeed() ^ chunkPos.toLong();
 		Random random = Random.create(seed);
+		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
@@ -76,7 +77,7 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos);
+					int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos, chunkAvailabilityCache);
 					int minimumLayers = surroundingFullBlocks / 2;
 					int maximumLayers = config.baseMaxLayers();
 
@@ -89,7 +90,7 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					setSandLayers(world, placementPos, layerCount);
+					setSandLayers(chunk, placementPos, layerCount);
 					continue;
 				}
 
@@ -97,7 +98,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance())) {
+				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache)) {
 					continue;
 				}
 
@@ -116,21 +117,21 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				setSandLayers(world, placementPos, layerCount);
+				setSandLayers(chunk, placementPos, layerCount);
 			}
 		}
 	}
 
-	private static void setSandLayers(ServerWorld world, BlockPos pos, int layerCount) {
+	private static void setSandLayers(WorldChunk chunk, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
-		world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), 3);
+		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), false);
 	}
 
-	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center) {
+	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
 		int count = 0;
 		for (Direction direction : Direction.Type.HORIZONTAL) {
 			BlockPos neighborPos = center.offset(direction);
-			if (!isChunkAvailableForLookup(world, neighborPos.getX(), neighborPos.getZ())) {
+			if (!isChunkAvailableForLookup(world, neighborPos.getX(), neighborPos.getZ(), chunkAvailabilityCache)) {
 				continue;
 			}
 
@@ -172,7 +173,7 @@ public final class SandLayerChunkGeneration {
 		return state.isOpaqueFullCube();
 	}
 
-	public static boolean isNearDesertSand(ServerWorld world, BlockPos pos, int distance) {
+	public static boolean isNearDesertSand(ServerWorld world, BlockPos pos, int distance, Map<Long, Boolean> chunkAvailabilityCache) {
 		if (world.getBiome(pos).isIn(SANDSTORM_BIOMES)) {
 			return false;
 		}
@@ -192,7 +193,7 @@ public final class SandLayerChunkGeneration {
 			int checkX = centerX + offset[0];
 			int checkY = centerY + offset[1];
 			int checkZ = centerZ + offset[2];
-			if (checkY < minY || checkY > maxY || !isChunkAvailableForLookup(world, checkX, checkZ)) {
+			if (checkY < minY || checkY > maxY || !isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
 				continue;
 			}
 
@@ -211,7 +212,7 @@ public final class SandLayerChunkGeneration {
 			int checkX = centerX + offset[0];
 			int checkY = centerY + offset[1];
 			int checkZ = centerZ + offset[2];
-			if (checkY < minY || checkY > maxY || !isChunkAvailableForLookup(world, checkX, checkZ)) {
+			if (checkY < minY || checkY > maxY || !isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
 				continue;
 			}
 
@@ -224,8 +225,18 @@ public final class SandLayerChunkGeneration {
 		return false;
 	}
 
-	private static boolean isChunkAvailableForLookup(ServerWorld world, int blockX, int blockZ) {
-		return world.getChunk(blockX >> 4, blockZ >> 4, ChunkStatus.FULL, false) != null;
+	private static boolean isChunkAvailableForLookup(ServerWorld world, int blockX, int blockZ, Map<Long, Boolean> chunkAvailabilityCache) {
+		int chunkX = blockX >> 4;
+		int chunkZ = blockZ >> 4;
+		long key = ChunkPos.toLong(chunkX, chunkZ);
+		Boolean cached = chunkAvailabilityCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		boolean available = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false) != null;
+		chunkAvailabilityCache.put(key, available);
+		return available;
 	}
 
 	private static int[][] getSphereOffsets(int radius, boolean includeOrigin) {
