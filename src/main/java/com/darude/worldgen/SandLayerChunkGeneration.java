@@ -17,6 +17,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
+import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.HashMap;
@@ -75,7 +76,7 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					int surroundingFullBlocks = countHorizontalFullBlocks(world, chunkPos, placementPos);
+					int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos);
 					int minimumLayers = surroundingFullBlocks / 2;
 					int maximumLayers = config.baseMaxLayers();
 
@@ -96,13 +97,13 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (!isNearDesertSand(world, chunkPos, placementPos, config.nearDesertDistance())) {
+				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance())) {
 					continue;
 				}
 
 				BlockPos supportPos = placementPos.down();
 				BlockState supportState = world.getBlockState(supportPos);
-				if (!isNearDesertSpawnableSupport(world, supportPos, supportState, config)) {
+				if (!isNearDesertSpawnableSupport(supportState, config)) {
 					continue;
 				}
 
@@ -125,20 +126,15 @@ public final class SandLayerChunkGeneration {
 		world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), 3);
 	}
 
-	private static int countHorizontalFullBlocks(ServerWorld world, ChunkPos chunkPos, BlockPos center) {
+	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center) {
 		int count = 0;
-		int minX = chunkPos.getStartX();
-		int maxX = chunkPos.getEndX();
-		int minZ = chunkPos.getStartZ();
-		int maxZ = chunkPos.getEndZ();
-		int y = center.getY();
 		for (Direction direction : Direction.Type.HORIZONTAL) {
 			BlockPos neighborPos = center.offset(direction);
-			if (neighborPos.getX() < minX || neighborPos.getX() > maxX || neighborPos.getZ() < minZ || neighborPos.getZ() > maxZ) {
+			if (!isChunkAvailableForLookup(world, neighborPos.getX(), neighborPos.getZ())) {
 				continue;
 			}
 
-			if (y < world.getBottomY() || y > world.getTopYInclusive()) {
+			if (neighborPos.getY() < world.getBottomY() || neighborPos.getY() > world.getTopYInclusive()) {
 				continue;
 			}
 
@@ -165,7 +161,7 @@ public final class SandLayerChunkGeneration {
 		return false;
 	}
 
-	private static boolean isNearDesertSpawnableSupport(ServerWorld world, BlockPos pos, BlockState state, SandLayerGenerationConfig.Values config) {
+	private static boolean isNearDesertSpawnableSupport(BlockState state, SandLayerGenerationConfig.Values config) {
 		if ("tag_only".equals(config.nearDesertSpawnableSupportMode())) {
 			return state.isIn(SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS);
 		}
@@ -173,15 +169,11 @@ public final class SandLayerChunkGeneration {
 		return state.isOpaqueFullCube();
 	}
 
-	public static boolean isNearDesertSand(ServerWorld world, ChunkPos chunkPos, BlockPos pos, int distance) {
+	public static boolean isNearDesertSand(ServerWorld world, BlockPos pos, int distance) {
 		if (world.getBiome(pos).isIn(SANDSTORM_BIOMES)) {
 			return false;
 		}
 
-		int minX = chunkPos.getStartX();
-		int maxX = chunkPos.getEndX();
-		int minZ = chunkPos.getStartZ();
-		int maxZ = chunkPos.getEndZ();
 		int minY = world.getBottomY();
 		int maxY = world.getTopYInclusive();
 		BlockPos.Mutable mutablePos = new BlockPos.Mutable();
@@ -197,7 +189,7 @@ public final class SandLayerChunkGeneration {
 			int checkX = centerX + offset[0];
 			int checkY = centerY + offset[1];
 			int checkZ = centerZ + offset[2];
-			if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
+			if (checkY < minY || checkY > maxY || !isChunkAvailableForLookup(world, checkX, checkZ)) {
 				continue;
 			}
 
@@ -216,7 +208,7 @@ public final class SandLayerChunkGeneration {
 			int checkX = centerX + offset[0];
 			int checkY = centerY + offset[1];
 			int checkZ = centerZ + offset[2];
-			if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
+			if (checkY < minY || checkY > maxY || !isChunkAvailableForLookup(world, checkX, checkZ)) {
 				continue;
 			}
 
@@ -227,6 +219,10 @@ public final class SandLayerChunkGeneration {
 		}
 
 		return false;
+	}
+
+	private static boolean isChunkAvailableForLookup(ServerWorld world, int blockX, int blockZ) {
+		return world.getChunk(blockX >> 4, blockZ >> 4, ChunkStatus.FULL, false) != null;
 	}
 
 	private static int[][] getSphereOffsets(int radius, boolean includeOrigin) {
