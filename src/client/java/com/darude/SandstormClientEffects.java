@@ -74,31 +74,4 @@ public final class SandstormClientEffects {
 
 		return world.getBiome(pos).isIn(SANDSTORM_BIOMES);
 	}
-
-	public static boolean isWithinThreeBlocksOfSandstormBiomeExcludingCurrent(ClientWorld world, BlockPos pos) {
-		if (world.getBiome(pos).isIn(SANDSTORM_BIOMES)) {
-			return false;
-		}
-
-		for (int dx = -3; dx <= 3; dx++) {
-			for (int dy = -3; dy <= 3; dy++) {
-				for (int dz = -3; dz <= 3; dz++) {
-					if (dx == 0 && dy == 0 && dz == 0) {
-						continue;
-					}
-
-					if (dx * dx + dy * dy + dz * dz > 9) {
-						continue;
-					}
-
-					BlockPos nearbyPos = pos.add(dx, dy, dz);
-					if (world.getBiome(nearbyPos).isIn(SANDSTORM_BIOMES)) {
-						return true;
-					}
-				}
-			}
-		}
-
-		return false;
-	}
 }
