@@ -19,10 +19,14 @@ import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.WorldChunk;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public final class SandLayerChunkGeneration {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_SUPPORT = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_support"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
+	private static final Map<Integer, int[][]> SPHERE_OFFSETS_CACHE = new HashMap<>();
 
 	private SandLayerChunkGeneration() {
 	}
@@ -181,40 +185,25 @@ public final class SandLayerChunkGeneration {
 		int minY = world.getBottomY();
 		int maxY = world.getTopYInclusive();
 		BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+		int centerX = pos.getX();
+		int centerY = pos.getY();
+		int centerZ = pos.getZ();
+		int[][] biomeOffsets = getSphereOffsets(distance, false);
+		int[][] sandOffsets = getSphereOffsets(distance + 2, true);
 
 		boolean nearDesertBiome = false;
 
-		for (int dx = -distance; dx <= distance; dx++) {
-			for (int dy = -distance; dy <= distance; dy++) {
-				for (int dz = -distance; dz <= distance; dz++) {
-					if (dx == 0 && dy == 0 && dz == 0) {
-						continue;
-					}
-
-					if (dx * dx + dy * dy + dz * dz > distance * distance) {
-						continue;
-					}
-
-					int checkX = pos.getX() + dx;
-					int checkY = pos.getY() + dy;
-					int checkZ = pos.getZ() + dz;
-					if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
-						continue;
-					}
-
-					mutablePos.set(checkX, checkY, checkZ);
-					if (world.getBiome(mutablePos).isIn(SANDSTORM_BIOMES)) {
-						nearDesertBiome = true;
-						break;
-					}
-				}
-
-				if (nearDesertBiome) {
-					break;
-				}
+		for (int[] offset : biomeOffsets) {
+			int checkX = centerX + offset[0];
+			int checkY = centerY + offset[1];
+			int checkZ = centerZ + offset[2];
+			if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
+				continue;
 			}
 
-			if (nearDesertBiome) {
+			mutablePos.set(checkX, checkY, checkZ);
+			if (world.getBiome(mutablePos).isIn(SANDSTORM_BIOMES)) {
+				nearDesertBiome = true;
 				break;
 			}
 		}
@@ -223,29 +212,59 @@ public final class SandLayerChunkGeneration {
 			return false;
 		}
 
-		int sandDistance = distance + 2;
-		for (int dx = -sandDistance; dx <= sandDistance; dx++) {
-			for (int dy = -sandDistance; dy <= sandDistance; dy++) {
-				for (int dz = -sandDistance; dz <= sandDistance; dz++) {
-					if (dx * dx + dy * dy + dz * dz > sandDistance * sandDistance) {
-						continue;
-					}
+		for (int[] offset : sandOffsets) {
+			int checkX = centerX + offset[0];
+			int checkY = centerY + offset[1];
+			int checkZ = centerZ + offset[2];
+			if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
+				continue;
+			}
 
-					int checkX = pos.getX() + dx;
-					int checkY = pos.getY() + dy;
-					int checkZ = pos.getZ() + dz;
-					if (checkX < minX || checkX > maxX || checkZ < minZ || checkZ > maxZ || checkY < minY || checkY > maxY) {
-						continue;
-					}
-
-					mutablePos.set(checkX, checkY, checkZ);
-					if (world.getBlockState(mutablePos).isOf(Blocks.SAND)) {
-						return true;
-					}
-				}
+			mutablePos.set(checkX, checkY, checkZ);
+			if (world.getBlockState(mutablePos).isOf(Blocks.SAND)) {
+				return true;
 			}
 		}
 
 		return false;
+	}
+
+	private static int[][] getSphereOffsets(int radius, boolean includeOrigin) {
+		if (radius <= 0) {
+			return includeOrigin ? new int[][]{{0, 0, 0}} : new int[0][];
+		}
+
+		int key = includeOrigin ? radius : -radius;
+		int[][] cached = SPHERE_OFFSETS_CACHE.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		int diameter = radius * 2 + 1;
+		int maxCount = diameter * diameter * diameter;
+		int[][] temp = new int[maxCount][];
+		int count = 0;
+		int radiusSquared = radius * radius;
+
+		for (int dx = -radius; dx <= radius; dx++) {
+			for (int dy = -radius; dy <= radius; dy++) {
+				for (int dz = -radius; dz <= radius; dz++) {
+					if (!includeOrigin && dx == 0 && dy == 0 && dz == 0) {
+						continue;
+					}
+
+					if (dx * dx + dy * dy + dz * dz > radiusSquared) {
+						continue;
+					}
+
+					temp[count++] = new int[]{dx, dy, dz};
+				}
+			}
+		}
+
+		int[][] offsets = new int[count][];
+		System.arraycopy(temp, 0, offsets, 0, count);
+		SPHERE_OFFSETS_CACHE.put(key, offsets);
+		return offsets;
 	}
 }
