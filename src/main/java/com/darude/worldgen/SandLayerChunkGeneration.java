@@ -147,18 +147,21 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static boolean isUnderLeaves(ServerWorld world, BlockPos pos) {
-		BlockPos.Mutable mutablePos = new BlockPos.Mutable(pos.getX(), pos.getY() + 1, pos.getZ());
-		for (int y = pos.getY() + 1; y <= world.getTopYInclusive(); y++) {
-			mutablePos.setY(y);
-			BlockState checkState = world.getBlockState(mutablePos);
-			if (checkState.isAir()) {
-				continue;
-			}
+		int x = pos.getX();
+		int z = pos.getZ();
 
-			return checkState.isIn(BlockTags.LEAVES);
+		int topSurfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1;
+		if (topSurfaceY <= pos.getY()) {
+			return false;
 		}
 
-		return false;
+		BlockState topSurfaceState = world.getBlockState(new BlockPos(x, topSurfaceY, z));
+		if (!topSurfaceState.isIn(BlockTags.LEAVES)) {
+			return false;
+		}
+
+		int topNonLeavesY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+		return topNonLeavesY <= pos.getY();
 	}
 
 	private static boolean isNearDesertSpawnableSupport(BlockState state, SandLayerGenerationConfig.Values config) {
