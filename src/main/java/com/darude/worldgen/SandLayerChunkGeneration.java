@@ -46,7 +46,7 @@ public final class SandLayerChunkGeneration {
 				int z = chunkPos.getStartZ() + localZ;
 				int y = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
 
-				if (y <= world.getBottomY() || y >= world.getTopY()) {
+				if (y <= world.getBottomY() || y >= world.getTopYInclusive()) {
 					continue;
 				}
 
@@ -128,7 +128,7 @@ public final class SandLayerChunkGeneration {
 		for (Direction direction : Direction.Type.HORIZONTAL) {
 			BlockPos neighborPos = center.offset(direction);
 			BlockState state = world.getBlockState(neighborPos);
-			if (state.isOpaqueFullCube(world, neighborPos)) {
+			if (state.isOpaqueFullCube()) {
 				count++;
 			}
 		}
@@ -154,7 +154,7 @@ public final class SandLayerChunkGeneration {
 			return state.isIn(SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS);
 		}
 
-		return state.isOpaqueFullCube(world, pos);
+		return state.isOpaqueFullCube();
 	}
 
 	public static boolean isNearDesertSand(ServerWorld world, BlockPos pos, int distance) {
