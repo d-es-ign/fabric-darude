@@ -22,12 +22,15 @@ import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SandLayerChunkGeneration {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_SUPPORT = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_support"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
-	private static final Map<Integer, int[][]> CIRCLE_OFFSETS_CACHE = new HashMap<>();
+	private static final ConcurrentHashMap<Integer, int[][]> CIRCLE_OFFSETS_CACHE = new ConcurrentHashMap<>();
+	private static final int NEAR_DESERT_COLUMN_SAMPLE_DENOMINATOR = 8;
+	private static final int NEAR_DESERT_COLUMN_SAMPLE_NUMERATOR = 6;
 
 	private SandLayerChunkGeneration() {
 	}
@@ -46,12 +49,13 @@ public final class SandLayerChunkGeneration {
 		long seed = world.getSeed() ^ chunkPos.toLong();
 		Random random = Random.create(seed);
 		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
+		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
 				int x = chunkPos.getStartX() + localX;
 				int z = chunkPos.getStartZ() + localZ;
-				int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+				int y = getTopYNoLeaves(world, x, z, topYNoLeavesCache);
 
 				if (y < world.getBottomY() || y > world.getTopYInclusive()) {
 					continue;
@@ -98,11 +102,15 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
+				if (!shouldSampleNearDesertColumn(chunkPos, localX, localZ)) {
+					continue;
+				}
+
 				if (config.nearDesertValidSpotChance() <= 0.0f || random.nextFloat() >= config.nearDesertValidSpotChance()) {
 					continue;
 				}
 
-				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache)) {
+				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache)) {
 					continue;
 				}
 
@@ -173,7 +181,13 @@ public final class SandLayerChunkGeneration {
 		return state.isOpaqueFullCube();
 	}
 
-	public static boolean isNearDesertSand(ServerWorld world, BlockPos pos, int distance, Map<Long, Boolean> chunkAvailabilityCache) {
+	public static boolean isNearDesertSand(
+		ServerWorld world,
+		BlockPos pos,
+		int distance,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache
+	) {
 		if (world.getBiome(pos).isIn(SANDSTORM_BIOMES)) {
 			return false;
 		}
@@ -212,7 +226,7 @@ public final class SandLayerChunkGeneration {
 				continue;
 			}
 
-			int checkY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, checkX, checkZ) - 1;
+			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
 			if (checkY < world.getBottomY() || checkY > world.getTopYInclusive()) {
 				continue;
 			}
@@ -246,10 +260,10 @@ public final class SandLayerChunkGeneration {
 		}
 
 		int key = includeOrigin ? radius : -radius;
-		int[][] cached = CIRCLE_OFFSETS_CACHE.get(key);
-		if (cached != null) {
-			return cached;
-		}
+		return CIRCLE_OFFSETS_CACHE.computeIfAbsent(key, ignored -> buildCircleOffsets(radius, includeOrigin));
+}
+
+	private static int[][] buildCircleOffsets(int radius, boolean includeOrigin) {
 
 		int diameter = radius * 2 + 1;
 		int maxCount = diameter * diameter;
@@ -273,7 +287,24 @@ public final class SandLayerChunkGeneration {
 
 		int[][] offsets = new int[count][];
 		System.arraycopy(temp, 0, offsets, 0, count);
-		CIRCLE_OFFSETS_CACHE.put(key, offsets);
 		return offsets;
+	}
+
+	private static int getTopYNoLeaves(ServerWorld world, int x, int z, Map<Long, Integer> topYNoLeavesCache) {
+		long key = (((long) x) << 32) ^ (z & 0xffffffffL);
+		Integer cached = topYNoLeavesCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+		topYNoLeavesCache.put(key, topY);
+		return topY;
+	}
+
+	private static boolean shouldSampleNearDesertColumn(ChunkPos chunkPos, int localX, int localZ) {
+		int hash = (int) (chunkPos.toLong() ^ (localX * 73428767L) ^ (localZ * 912931L));
+		int bucket = Math.floorMod(hash, NEAR_DESERT_COLUMN_SAMPLE_DENOMINATOR);
+		return bucket < NEAR_DESERT_COLUMN_SAMPLE_NUMERATOR;
 	}
 }

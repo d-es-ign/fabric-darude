@@ -25,6 +25,10 @@ public final class SandstormClientEffects {
 	private static long nextWindShiftTick;
 	private static long windBlendStartTick;
 	private static ClientWorld currentWindWorld;
+	private static ClientWorld cachedSandstormWorld;
+	private static long cachedSandstormTick = Long.MIN_VALUE;
+	private static long cachedSandstormCameraPos = Long.MIN_VALUE;
+	private static boolean cachedSandstormActive;
 
 	private SandstormClientEffects() {
 	}
@@ -69,9 +73,16 @@ public final class SandstormClientEffects {
 		double baseVz = blendedWindZ * 0.32;
 
 		for (int i = 0; i < particleCount; i++) {
-			double x = origin.x + (random.nextDouble() - 0.5) * 34.0;
+			double xOffset = (random.nextDouble() - 0.5) * 34.0;
+			double zOffset = (random.nextDouble() - 0.5) * 34.0;
+			double distanceRatio = (xOffset * xOffset + zOffset * zOffset) / (34.0 * 34.0);
+			if (random.nextDouble() > (1.0 - Math.min(1.0, distanceRatio))) {
+				continue;
+			}
+
+			double x = origin.x + xOffset;
 			double y = origin.y + random.nextDouble() * 10.0;
-			double z = origin.z + (random.nextDouble() - 0.5) * 34.0;
+			double z = origin.z + zOffset;
 
 			double vx = baseVx + (random.nextDouble() - 0.5) * 0.08;
 			double vy = -0.10 - random.nextDouble() * 0.06;
@@ -132,6 +143,7 @@ public final class SandstormClientEffects {
 		}
 
 		currentWindWorld = world;
+		resetSandstormActiveCache();
 		windDirection = Direction.NORTH;
 		previousWindDirection = Direction.NORTH;
 		if (world == null) {
@@ -169,11 +181,30 @@ public final class SandstormClientEffects {
 			return false;
 		}
 
-		return isSandstormActive(world, new Vec3d(
+		long tick = world.getTime();
+		BlockPos cameraPos = BlockPos.ofFloored(client.getCameraEntity().getX(), client.getCameraEntity().getY(), client.getCameraEntity().getZ());
+		long cameraPosLong = cameraPos.asLong();
+		if (world == cachedSandstormWorld && tick == cachedSandstormTick && cameraPosLong == cachedSandstormCameraPos) {
+			return cachedSandstormActive;
+		}
+
+		boolean active = isSandstormActive(world, new Vec3d(
 			client.getCameraEntity().getX(),
 			client.getCameraEntity().getY(),
 			client.getCameraEntity().getZ()
 		));
+		cachedSandstormWorld = world;
+		cachedSandstormTick = tick;
+		cachedSandstormCameraPos = cameraPosLong;
+		cachedSandstormActive = active;
+		return active;
+	}
+
+	private static void resetSandstormActiveCache() {
+		cachedSandstormWorld = null;
+		cachedSandstormTick = Long.MIN_VALUE;
+		cachedSandstormCameraPos = Long.MIN_VALUE;
+		cachedSandstormActive = false;
 	}
 
 	public static boolean isSandstormActive(ClientWorld world, Vec3d cameraPos) {
