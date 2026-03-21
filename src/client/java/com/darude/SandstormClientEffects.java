@@ -12,6 +12,9 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.util.Identifier;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(0xD8C48C, 1.0f);
@@ -19,6 +22,10 @@ public final class SandstormClientEffects {
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
 	private static final int BASE_MAX_PARTICLES_PER_TICK = 48;
+	private static final float BASE_FOG_START = 48.0f;
+	private static final float BASE_FOG_END = 64.0f;
+	private static final float GUST_FOG_START = 30.0f;
+	private static final float GUST_FOG_END = 44.0f;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 	private static Direction windDirection = Direction.NORTH;
 	private static Direction previousWindDirection = Direction.NORTH;
@@ -181,6 +188,59 @@ public final class SandstormClientEffects {
 		}
 
 		return getWindTransitionProgress(client);
+	}
+
+	public static List<String> getDebugLines(MinecraftClient client) {
+		List<String> lines = new ArrayList<>(12);
+		lines.add("[Darude] Sandstorm");
+
+		ClientWorld world = client.world;
+		if (world == null || client.getCameraEntity() == null) {
+			lines.add("Active: false (no world)");
+			return lines;
+		}
+
+		BlockPos cameraPos = BlockPos.ofFloored(
+			client.getCameraEntity().getX(),
+			client.getCameraEntity().getY(),
+			client.getCameraEntity().getZ()
+		);
+
+		boolean biomeMatch = world.getBiome(cameraPos).isIn(SANDSTORM_BIOMES);
+		boolean skyVisible = world.isSkyVisible(cameraPos);
+		boolean active = isSandstormActive(client);
+		float windProgress = getWindTransitionProgress(client);
+		ParticleTuning tuning = getParticleTuning(client);
+		float rainGradient = world.getRainGradient(1.0f);
+		int particleBudget = Math.min(Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier), tuning.maxPerTick);
+
+		lines.add("Active: " + active);
+		lines.add("Biome Match: " + biomeMatch);
+		lines.add("Sky Visible: " + skyVisible);
+		lines.add("Wind Dir: " + windDirection.asString());
+		lines.add(String.format("Wind Transition: %.2f", windProgress));
+		lines.add("Particle Mode: " + getParticleModeName(client));
+		lines.add("Particle Budget: " + Math.max(0, particleBudget) + " (cap=" + tuning.maxPerTick + ", interval=" + tuning.intervalTicks + "t)");
+		lines.add(String.format("Fog Start/End: %.1f / %.1f", getAnimatedFogStart(client), getAnimatedFogEnd(client)));
+
+		return lines;
+	}
+
+	public static float getAnimatedFogStart(MinecraftClient client) {
+		return (float) lerp(BASE_FOG_START, GUST_FOG_START, getWindTransitionProgress(client));
+	}
+
+	public static float getAnimatedFogEnd(MinecraftClient client) {
+		return (float) lerp(BASE_FOG_END, GUST_FOG_END, getWindTransitionProgress(client));
+	}
+
+	private static String getParticleModeName(MinecraftClient client) {
+		Object mode = client.options.getParticles().getValue();
+		if (mode instanceof Enum<?> modeEnum) {
+			return modeEnum.name();
+		}
+
+		return "UNKNOWN";
 	}
 
 	public static boolean isSandstormActive(MinecraftClient client) {
