@@ -3,7 +3,6 @@ package com.darude;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.particle.DustParticleEffect;
-import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.math.Direction;
@@ -18,6 +17,8 @@ public final class SandstormClientEffects {
 	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(0xD8C48C, 1.0f);
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
+	private static final int BASE_PARTICLE_INTERVAL_TICKS = 2;
+	private static final int BASE_MAX_PARTICLES_PER_TICK = 60;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 	private static Direction windDirection = Direction.NORTH;
 	private static Direction previousWindDirection = Direction.NORTH;
@@ -48,7 +49,17 @@ public final class SandstormClientEffects {
 		updateWindDirection(world, random);
 
 		float rainGradient = world.getRainGradient(1.0f);
-		int particleCount = 30 + Math.round(90.0f * rainGradient);
+ 
+		ParticleTuning tuning = getParticleTuning(client);
+		if (world.getTime() % tuning.intervalTicks != 0) {
+			return;
+		}
+
+		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier);
+		particleCount = Math.min(particleCount, BASE_MAX_PARTICLES_PER_TICK);
+		if (particleCount <= 0) {
+			return;
+		}
 
 		float blendProgress = Math.min(1.0f, (world.getTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS);
 		double blendedWindX = lerp(previousWindDirection.getOffsetX(), windDirection.getOffsetX(), blendProgress);
@@ -67,16 +78,6 @@ public final class SandstormClientEffects {
 			double vz = baseVz + (random.nextDouble() - 0.5) * 0.08;
 
 			client.particleManager.addParticle(SAND_DUST, x, y, z, vx, vy, vz);
-		}
-
-		if (random.nextFloat() < 0.75f) {
-			double x = origin.x + (random.nextDouble() - 0.5) * 24.0;
-			double y = origin.y + random.nextDouble() * 10.0;
-			double z = origin.z + (random.nextDouble() - 0.5) * 24.0;
-			double vx = baseVx * 0.65 + (random.nextDouble() - 0.5) * 0.05;
-			double vy = -0.07 - random.nextDouble() * 0.03;
-			double vz = baseVz * 0.65 + (random.nextDouble() - 0.5) * 0.05;
-			client.particleManager.addParticle(ParticleTypes.WHITE_ASH, x, y, z, vx, vy, vz);
 		}
 	}
 
@@ -104,6 +105,25 @@ public final class SandstormClientEffects {
 
 	private static double lerp(double start, double end, float progress) {
 		return start + (end - start) * progress;
+	}
+
+	private static ParticleTuning getParticleTuning(MinecraftClient client) {
+		Object mode = client.options.getParticles().getValue();
+		if (mode instanceof Enum<?> modeEnum) {
+			String name = modeEnum.name();
+			if ("MINIMAL".equals(name)) {
+				return new ParticleTuning(0.2f, BASE_PARTICLE_INTERVAL_TICKS * 3);
+			}
+
+			if ("DECREASED".equals(name)) {
+				return new ParticleTuning(0.5f, BASE_PARTICLE_INTERVAL_TICKS * 2);
+			}
+		}
+
+		return new ParticleTuning(1.0f, BASE_PARTICLE_INTERVAL_TICKS);
+	}
+
+	private record ParticleTuning(float densityMultiplier, int intervalTicks) {
 	}
 
 	private static void syncWindWorld(ClientWorld world) {

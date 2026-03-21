@@ -98,6 +98,10 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
+				if (config.nearDesertValidSpotChance() <= 0.0f || random.nextFloat() >= config.nearDesertValidSpotChance()) {
+					continue;
+				}
+
 				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache)) {
 					continue;
 				}
@@ -105,10 +109,6 @@ public final class SandLayerChunkGeneration {
 				BlockPos supportPos = placementPos.down();
 				BlockState supportState = world.getBlockState(supportPos);
 				if (!isNearDesertSpawnableSupport(supportState, config)) {
-					continue;
-				}
-
-				if (config.nearDesertValidSpotChance() <= 0.0f || random.nextFloat() >= config.nearDesertValidSpotChance()) {
 					continue;
 				}
 
