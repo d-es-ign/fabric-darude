@@ -12,11 +12,10 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.util.Identifier;
-import org.joml.Vector3f;
 
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(new Vector3f(216.0f / 255.0f, 196.0f / 255.0f, 140.0f / 255.0f), 1.0f);
+	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(0xD8C48C, 1.0f);
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
@@ -61,7 +60,7 @@ public final class SandstormClientEffects {
 			double vy = -0.10 - random.nextDouble() * 0.06;
 			double vz = baseVz + (random.nextDouble() - 0.5) * 0.08;
 
-			world.addParticle(SAND_DUST, false, false, x, y, z, vx, vy, vz);
+			client.particleManager.addParticle(SAND_DUST, x, y, z, vx, vy, vz);
 		}
 
 		if (random.nextFloat() < 0.75f) {
@@ -71,7 +70,7 @@ public final class SandstormClientEffects {
 			double vx = baseVx * 0.65 + (random.nextDouble() - 0.5) * 0.05;
 			double vy = -0.07 - random.nextDouble() * 0.03;
 			double vz = baseVz * 0.65 + (random.nextDouble() - 0.5) * 0.05;
-			world.addParticle(ParticleTypes.WHITE_ASH, false, false, x, y, z, vx, vy, vz);
+			client.particleManager.addParticle(ParticleTypes.WHITE_ASH, x, y, z, vx, vy, vz);
 		}
 	}
 
