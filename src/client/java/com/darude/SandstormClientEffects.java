@@ -1,8 +1,8 @@
 package com.darude;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.particle.DustParticleEffect;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
@@ -32,7 +32,7 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		Vec3d origin = client.player.getPos();
+		Vec3d origin = client.player.getPosition();
 		for (int i = 0; i < 12; i++) {
 			double x = origin.x + (world.random.nextDouble() - 0.5) * 28.0;
 			double y = origin.y + world.random.nextDouble() * 8.0;
@@ -42,24 +42,24 @@ public final class SandstormClientEffects {
 			double vy = -0.02 - world.random.nextDouble() * 0.02;
 			double vz = (world.random.nextDouble() - 0.5) * 0.02;
 
-			world.addParticle(SANDSTORM_PARTICLE, x, y, z, vx, vy, vz);
+			world.addParticle(SANDSTORM_PARTICLE, false, false, x, y, z, vx, vy, vz);
 		}
 
 		if (world.random.nextFloat() < 0.35f) {
 			double x = origin.x + (world.random.nextDouble() - 0.5) * 24.0;
 			double y = origin.y + world.random.nextDouble() * 10.0;
 			double z = origin.z + (world.random.nextDouble() - 0.5) * 24.0;
-			world.addParticle(ParticleTypes.WHITE_ASH, x, y, z, 0.0, -0.01, 0.0);
+			world.addParticle(ParticleTypes.WHITE_ASH, false, false, x, y, z, 0.0, -0.01, 0.0);
 		}
 	}
 
 	public static boolean isSandstormActive(MinecraftClient client) {
 		ClientWorld world = client.world;
-		if (world == null || client.cameraEntity == null) {
+		if (world == null || client.getCameraEntity() == null) {
 			return false;
 		}
 
-		return isSandstormActive(world, client.cameraEntity.getPos());
+		return isSandstormActive(world, client.getCameraEntity().getPosition());
 	}
 
 	public static boolean isSandstormActive(ClientWorld world, Vec3d cameraPos) {

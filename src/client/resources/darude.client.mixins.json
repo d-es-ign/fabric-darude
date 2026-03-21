@@ -2,10 +2,7 @@
 	"required": true,
 	"package": "com.darude.mixin.client",
 	"compatibilityLevel": "JAVA_21",
-	"client": [
-		"DarudeClientMixin",
-		"SandstormFogMixin"
-	],
+	"client": [],
 	"injectors": {
 		"defaultRequire": 1
 	}
