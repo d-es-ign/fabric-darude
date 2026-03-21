@@ -13,6 +13,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 public abstract class SandstormFogMixin {
 	private static final float SANDSTORM_FOG_END = 64.0f;
 	private static final float SANDSTORM_FOG_START = 48.0f;
+	private static final float GUST_FOG_END = 44.0f;
+	private static final float GUST_FOG_START = 30.0f;
 
 	@Inject(
 		method = "applyFog(Lnet/minecraft/client/render/Camera;ILnet/minecraft/client/render/RenderTickCounter;FLnet/minecraft/client/world/ClientWorld;)Lorg/joml/Vector4f;",
@@ -21,12 +23,15 @@ public abstract class SandstormFogMixin {
 		require = 0
 	)
 	private void darude$darkenFogColor(CallbackInfoReturnable<Vector4f> cir) {
-		if (!SandstormClientEffects.isSandstormActive(MinecraftClient.getInstance())) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return;
 		}
 
+		float transitionProgress = SandstormClientEffects.getWindTransitionProgress(client);
 		Vector4f color = new Vector4f(cir.getReturnValue());
-		cir.setReturnValue(color.mul(0.78f, 0.72f, 0.64f, 1.0f));
+		float colorScale = lerp(0.78f, 0.62f, transitionProgress);
+		cir.setReturnValue(color.mul(colorScale, colorScale * 0.92f, colorScale * 0.82f, 1.0f));
 	}
 
 	@ModifyVariable(
@@ -37,11 +42,15 @@ public abstract class SandstormFogMixin {
 		require = 0
 	)
 	private float darude$clampRenderDistanceStart(float value) {
-		if (!SandstormClientEffects.isSandstormActive(MinecraftClient.getInstance())) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return value;
 		}
 
-		return Math.min(value, SANDSTORM_FOG_START);
+		float transitionProgress = SandstormClientEffects.getWindTransitionProgress(client);
+		float animatedFogStart = lerp(SANDSTORM_FOG_START, GUST_FOG_START, transitionProgress);
+
+		return Math.min(value, animatedFogStart);
 	}
 
 	@ModifyVariable(
@@ -52,10 +61,18 @@ public abstract class SandstormFogMixin {
 		require = 0
 	)
 	private float darude$clampRenderDistanceEnd(float value) {
-		if (!SandstormClientEffects.isSandstormActive(MinecraftClient.getInstance())) {
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return value;
 		}
 
-		return Math.min(value, SANDSTORM_FOG_END);
+		float transitionProgress = SandstormClientEffects.getWindTransitionProgress(client);
+		float animatedFogEnd = lerp(SANDSTORM_FOG_END, GUST_FOG_END, transitionProgress);
+
+		return Math.min(value, animatedFogEnd);
+	}
+
+	private static float lerp(float start, float end, float progress) {
+		return start + (end - start) * progress;
 	}
 }
