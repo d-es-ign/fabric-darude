@@ -38,7 +38,8 @@ public final class SandLayerChunkGeneration {
 		}
 
 		ChunkPos chunkPos = chunk.getPos();
-		Random random = world.getRandom();
+		long seed = world.getSeed() ^ chunkPos.toLong();
+		Random random = Random.create(seed);
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
