@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 public final class SandLayerGenerationConfig {
 	private static final Identifier CONFIG_ID = Identifier.of(DarudeMod.MOD_ID, "worldgen/sand_layer_generation.json");
 	private static final Identifier RELOAD_LISTENER_ID = Identifier.of(DarudeMod.MOD_ID, "sand_layer_generation_config");
-	private static volatile Values values = new Values(0.3f, 4);
+	private static volatile Values values = Values.defaults();
 
 	private SandLayerGenerationConfig() {
 	}
@@ -40,7 +40,7 @@ public final class SandLayerGenerationConfig {
 	}
 
 	private static Values load(ResourceManager manager) {
-		Values defaults = new Values(0.3f, 4);
+		Values defaults = Values.defaults();
 		return manager.getResource(CONFIG_ID)
 			.map(resource -> {
 				try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
@@ -51,10 +51,46 @@ public final class SandLayerGenerationConfig {
 					int baseMaxLayers = root.has("base_max_layers")
 						? root.get("base_max_layers").getAsInt()
 						: defaults.baseMaxLayers();
+					int nearDesertDistance = root.has("near_desert_distance")
+						? root.get("near_desert_distance").getAsInt()
+						: defaults.nearDesertDistance();
+					float nearDesertValidSpotChance = root.has("near_desert_valid_spot_chance")
+						? root.get("near_desert_valid_spot_chance").getAsFloat()
+						: defaults.nearDesertValidSpotChance();
+					int nearDesertMinLayers = root.has("near_desert_min_layers")
+						? root.get("near_desert_min_layers").getAsInt()
+						: defaults.nearDesertMinLayers();
+					int nearDesertMaxLayers = root.has("near_desert_max_layers")
+						? root.get("near_desert_max_layers").getAsInt()
+						: defaults.nearDesertMaxLayers();
+					String nearDesertSpawnableSupportMode = root.has("near_desert_spawnable_support_mode")
+						? root.get("near_desert_spawnable_support_mode").getAsString()
+						: defaults.nearDesertSpawnableSupportMode();
 
 					validSpotChance = clamp(validSpotChance, 0.0f, 1.0f);
 					baseMaxLayers = clamp(baseMaxLayers, 0, 15);
-					return new Values(validSpotChance, baseMaxLayers);
+					nearDesertDistance = clamp(nearDesertDistance, 0, 16);
+					nearDesertValidSpotChance = clamp(nearDesertValidSpotChance, 0.0f, 1.0f);
+					nearDesertMinLayers = clamp(nearDesertMinLayers, 0, 15);
+					nearDesertMaxLayers = clamp(nearDesertMaxLayers, 0, 15);
+					if (nearDesertMinLayers > nearDesertMaxLayers) {
+						int swap = nearDesertMinLayers;
+						nearDesertMinLayers = nearDesertMaxLayers;
+						nearDesertMaxLayers = swap;
+					}
+					if (!"full_block".equals(nearDesertSpawnableSupportMode) && !"tag_only".equals(nearDesertSpawnableSupportMode)) {
+						nearDesertSpawnableSupportMode = defaults.nearDesertSpawnableSupportMode();
+					}
+
+					return new Values(
+						validSpotChance,
+						baseMaxLayers,
+						nearDesertDistance,
+						nearDesertValidSpotChance,
+						nearDesertMinLayers,
+						nearDesertMaxLayers,
+						nearDesertSpawnableSupportMode
+					);
 				} catch (Exception e) {
 					DarudeMod.LOGGER.warn("Failed to parse {}. Using defaults.", CONFIG_ID, e);
 					return defaults;
@@ -71,6 +107,17 @@ public final class SandLayerGenerationConfig {
 		return Math.max(min, Math.min(max, value));
 	}
 
-	public record Values(float validSpotChance, int baseMaxLayers) {
+	public record Values(
+		float validSpotChance,
+		int baseMaxLayers,
+		int nearDesertDistance,
+		float nearDesertValidSpotChance,
+		int nearDesertMinLayers,
+		int nearDesertMaxLayers,
+		String nearDesertSpawnableSupportMode
+	) {
+		public static Values defaults() {
+			return new Values(0.3f, 4, 2, 0.2f, 0, 2, "full_block");
+		}
 	}
 }
