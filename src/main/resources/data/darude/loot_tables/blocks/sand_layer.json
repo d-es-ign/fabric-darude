@@ -21,6 +21,14 @@
       ],
       "conditions": [
         {
+          "condition": "minecraft:match_tool",
+          "predicate": {
+            "items": [
+              "#minecraft:shovels"
+            ]
+          }
+        },
+        {
           "condition": "minecraft:survives_explosion"
         }
       ]
