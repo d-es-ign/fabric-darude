@@ -5,7 +5,6 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.Waterloggable;
-import net.minecraft.block.piston.PistonBehavior;
 import net.minecraft.entity.ai.pathing.NavigationType;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
@@ -21,6 +20,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.WorldEvents;
+import net.minecraft.world.WorldAccess;
 import net.minecraft.world.WorldView;
 import net.minecraft.world.tick.ScheduledTickView;
 import net.minecraft.util.math.random.Random;
@@ -100,7 +100,9 @@ public class SandLayerBlock extends Block implements Waterloggable {
 		Random random
 	) {
 		if (world.getFluidState(pos).isIn(FluidTags.LAVA)) {
-			world.syncWorldEvent(WorldEvents.LAVA_EXTINGUISHED, pos, 0);
+			if (world instanceof WorldAccess worldAccess) {
+				worldAccess.syncWorldEvent(WorldEvents.LAVA_EXTINGUISHED, pos, 0);
+			}
 			return state.get(WATERLOGGED) ? Blocks.WATER.getDefaultState() : Blocks.AIR.getDefaultState();
 		}
 
@@ -133,11 +135,6 @@ public class SandLayerBlock extends Block implements Waterloggable {
 	@Override
 	protected boolean canPathfindThrough(BlockState state, NavigationType type) {
 		return type == NavigationType.LAND && state.get(LAYERS) < 5;
-	}
-
-	@Override
-	public PistonBehavior getPistonBehavior(BlockState state) {
-		return PistonBehavior.DESTROY;
 	}
 
 	@Override

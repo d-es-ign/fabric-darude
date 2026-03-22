@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.piston.PistonBehavior;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroups;
@@ -19,6 +20,7 @@ public final class DarudeBlocks {
 			.copy(Blocks.SAND)
 			.sounds(BlockSoundGroup.SAND)
 			.nonOpaque()
+			.pistonBehavior(PistonBehavior.DESTROY)
 			.allowsSpawning((state, world, pos, type) -> {
 				int layers = state.get(SandLayerBlock.LAYERS);
 				return layers == 1 || layers >= 8;
