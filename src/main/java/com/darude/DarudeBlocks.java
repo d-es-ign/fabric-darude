@@ -19,6 +19,10 @@ public final class DarudeBlocks {
 			.copy(Blocks.SAND)
 			.sounds(BlockSoundGroup.SAND)
 			.nonOpaque()
+			.allowsSpawning((state, world, pos, type) -> {
+				int layers = state.get(SandLayerBlock.LAYERS);
+				return layers == 1 || layers >= 8;
+			})
 	));
 
 	private DarudeBlocks() {
