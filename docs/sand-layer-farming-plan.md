@@ -47,7 +47,7 @@ For all rules below where a sand layer is created/placed:
 ### Exposed Grate Qualification
 
 - Grate must be outside (sky/weather exposed by existing storm checks).
-- Grate must be surrounded by air horizontally.
+- Grate must be surrounded by air horizontally and above.
 - For base mode, block below can be any valid support context for placing below-target layers.
 - For pyramid mode, block directly below grate must be a pyramid block.
 
