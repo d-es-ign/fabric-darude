@@ -91,7 +91,7 @@ public final class Sandpile2D {
     }
 
     public int[] rawHeights() {
-        return h;
+        return java.util.Arrays.copyOf(h, h.length);
     }
 
     private int idx(int x, int y) {
