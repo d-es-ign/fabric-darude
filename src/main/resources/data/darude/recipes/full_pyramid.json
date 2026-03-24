@@ -6,7 +6,9 @@
     "sss"
   ],
   "key": {
-    "s": "minecraft:smooth_sandstone"
+    "s": {
+      "item": "minecraft:smooth_sandstone"
+    }
   },
   "result": {
     "id": "darude:full_pyramid",
