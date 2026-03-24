@@ -1,3 +1,5 @@
 {
-  "block.darude.sand_layer": "Sand Layer"
+  "block.darude.sand_layer": "Sand Layer",
+  "block.darude.pyramid": "Pyramid",
+  "block.darude.full_pyramid": "Full Pyramid"
 }
