@@ -1,6 +1,8 @@
 package com.darude;
 
+import com.darude.block.FullPyramidBlock;
 import com.darude.block.SandLayerBlock;
+import com.darude.block.PyramidBlock;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
@@ -27,11 +29,27 @@ public final class DarudeBlocks {
 			})
 	));
 
+	public static final Block PYRAMID = registerBlock("pyramid", new PyramidBlock(
+		AbstractBlock.Settings
+			.copy(Blocks.SMOOTH_SANDSTONE)
+			.nonOpaque()
+	));
+
+	public static final Block FULL_PYRAMID = registerBlock("full_pyramid", new FullPyramidBlock(
+		AbstractBlock.Settings
+			.copy(Blocks.SMOOTH_SANDSTONE)
+			.nonOpaque()
+	));
+
 	private DarudeBlocks() {
 	}
 
 	public static void initialize() {
-		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> entries.add(SAND_LAYER));
+		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> {
+			entries.add(SAND_LAYER);
+			entries.add(PYRAMID);
+			entries.add(FULL_PYRAMID);
+		});
 	}
 
 	private static Block registerBlock(String name, Block block) {
