@@ -29,7 +29,7 @@ For all rules below where a sand layer is created/placed:
 ## Core Loop (Farming Version)
 
 1. **Exposed Grate Intake**
-   - A `minecraft:copper_grate` that is outdoors, in a sandstorm, and surrounded by air on all sides can attempt generation.
+   - A `minecraft:copper_grate` that is outdoors, in a sandstorm, and surrounded by air on all sides, can attempt generation.
    - Base behavior: low chance to create exactly one `darude:sand_layer` directly beneath the grate.
 
 2. **Pyramid-Boosted Distribution**

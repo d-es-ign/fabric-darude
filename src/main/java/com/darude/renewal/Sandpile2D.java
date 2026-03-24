@@ -1,4 +1,8 @@
+package com.darude.renewal;
+
 public final class Sandpile2D {
+	private static final int MAX_CELLS = Integer.MAX_VALUE >>> 2;
+
 	private final int width;
 	private final int height;
 	private final int size;
@@ -20,7 +24,14 @@ public final class Sandpile2D {
 		if (width <= 0 || height <= 0) throw new IllegalArgumentException("Invalid size");
 		this.width = width;
 		this.height = height;
-		this.size = width * height;
+		try {
+			this.size = Math.multiplyExact(width, height);
+		} catch (ArithmeticException e) {
+			throw new IllegalArgumentException("Grid size overflow: " + width + "x" + height, e);
+		}
+		if (size > MAX_CELLS) {
+			throw new IllegalArgumentException("Grid too large: " + size + " cells (max " + MAX_CELLS + ")");
+		}
 
 		this.h = new int[size];
 		this.nbr = new int[size << 2];
@@ -60,6 +71,7 @@ public final class Sandpile2D {
     // Process up to maxTopples toppling events; returns number processed.
     // Call this each game tick with a fixed budget.
     public int relaxBudget(int maxTopples) {
+        if (maxTopples <= 0) return 0;
         int processed = 0;
 
         while (processed < maxTopples && qHead != qTail) {
@@ -69,18 +81,21 @@ public final class Sandpile2D {
 
             // Batch topples: if v=27 => qTopples=6 in one step.
             int qTopples = v >>> 2; // v / 4
-            h[i] = v - (qTopples << 2); // v % 4
+            int remainingBudget = maxTopples - processed;
+            int topples = Math.min(qTopples, remainingBudget);
+            h[i] = v - (topples << 2);
 
             int base = i << 2;
             for (int k = 0; k < 4; k++) {
                 int n = nbr[base + k];
                 if (n < 0) continue; // sink boundary
-                int nv = h[n] + qTopples;
+                int nv = h[n] + topples;
                 h[n] = nv;
                 if (nv >= 4) enqueue(n);
             }
 
-            processed++;
+            if (h[i] >= 4) enqueue(i);
+            processed += topples;
         }
 
         return processed;
