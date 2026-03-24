@@ -45,9 +45,11 @@ public final class DarudeBlocks {
 	}
 
 	public static void initialize() {
-		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> entries.add(SAND_LAYER));
-		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> entries.add(PYRAMID));
-		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> entries.add(FULL_PYRAMID));
+		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> {
+			entries.add(SAND_LAYER);
+			entries.add(PYRAMID);
+			entries.add(FULL_PYRAMID);
+		});
 	}
 
 	private static Block registerBlock(String name, Block block) {
