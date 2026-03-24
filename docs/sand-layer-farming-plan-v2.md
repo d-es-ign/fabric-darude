@@ -90,13 +90,20 @@ For all rules below where a sand layer is created/placed:
 ### Avalanche Rule Set
 
 - Trigger check only on generation-created increments.
-- Use configurable `slope_threshold` and/or height-delta rule.
-- Topple one layer at a time from unstable source to preferred valid neighbors.
-- Neighbor preference order:
-  1. marked collection channels
-  2. stable collector lanes
-  3. fallback valid cells
-- Never create net new layers through avalanche (conservation only).
+- Use configurable `slope_threshold` and height-delta rule.
+- Avalanche destination resolution uses horizontal neighbor probing with vertical settling: evaluate horizontal neighbors first, and when a neighbor is air, use that neighbor for delta checks (height = 0) and settle transferred layers into the cell directly below it.
+- Topple all layers from an unstable source and divide the transfer among horizontal neighbors where delta exceeds threshold.
+- Classify each candidate neighbor as:
+  - blocked: occupied by a non-air, non-`darude:sand_layer` block
+  - unplaceable: air (or `darude:sand_layer`) target path that still cannot accept a layer after placement checks
+  - valid: accepts transferred layers
+- Blocked neighbors do not receive layers; their share is redistributed across other valid neighbors.
+- Unplaceable neighbors cause their planned share to disperse (be lost), not redistributed.
+- If no valid neighbors exist and all candidates are blocked, no movement occurs and layers remain on the source pile.
+- If no valid neighbors exist and at least one candidate is unplaceable, all planned transfer disperses.
+- Division is deterministic: compute planned shares by equal split over all eligible delta neighbors, assign remainders by fixed cardinal order, then apply blocked/unplaceable outcomes above.
+- Transfer-time conversion is part of avalanche movement. If incoming layers would overflow `darude:sand_layer` height, convert full sets into `minecraft:sand` and place any remainder layers on top.
+- Avalanche never creates layers from nothing; movement is conservative except when layers are explicitly lost through dispersal.
 
 ## Hard Anti-Passive Rules (Recommended)
 
@@ -137,6 +144,7 @@ For all rules below where a sand layer is created/placed:
 - Instability evaluation runs only for cells changed by generation.
 - Player-placed layer changes do not enqueue avalanche work.
 - Process unstable cells via queue with per-tick budget.
+- `max_topples_per_tick` budgets unstable-source topple events (not individual moved layers).
 - Apply topples until local gradients return within threshold or budget is exhausted.
 
 ### Safety / Performance
@@ -233,7 +241,7 @@ Phase 4: Avalanche runtime (generation-only trigger)
 - [ ] Add active-cell queue for instability checks in `src/main/java/com/darude/renewal/`.
 - [ ] Enqueue avalanche checks only from generation success path.
 - [ ] Exclude player placement/update events from avalanche enqueue path.
-- [ ] Implement bounded topple loop with neighbor preference order.
+- [ ] Implement bounded topple loop using height-delta neighbor selection.
 
 Phase 5: Verification and telemetry
 
