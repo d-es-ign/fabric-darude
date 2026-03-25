@@ -1,3 +1,9 @@
+def inheritedProps = new Properties()
+file('../gradle.properties').withInputStream { inheritedProps.load(it) }
+def prop = { String key ->
+	project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
+}
+
 buildscript {
 	repositories {
 		maven {
@@ -7,7 +13,7 @@ buildscript {
 		mavenCentral()
 	}
 	dependencies {
-		classpath "net.fabricmc:fabric-loom:${loom_version}"
+		classpath "net.fabricmc:fabric-loom:1.14.10"
 	}
 }
 
@@ -15,9 +21,11 @@ apply plugin: 'fabric-loom'
 apply plugin: 'maven-publish'
 
 ext.bandSuffix = 'mc121'
-ext.minecraftVersion = project.minecraft_version_121
-ext.yarnMappings = project.yarn_mappings_121
-ext.fabricVersion = project.fabric_version_121
-ext.minecraftDepRange = project.minecraft_dep_range_121
+ext.minecraftVersion = prop('minecraft_version_121')
+ext.yarnMappings = prop('yarn_mappings_121')
+ext.fabricVersion = prop('fabric_version_121')
+ext.minecraftDepRange = prop('minecraft_dep_range_121')
+ext.loaderVersion = prop('loader_version')
+ext.junitVersion = prop('junit_jupiter_version')
 
-apply from: rootProject.file('gradle/mc-band.gradle')
+apply from: file('../gradle/mc-band.gradle')

@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: common
     strategy:
+      fail-fast: false
       matrix:
         module: [mc121, mc261]
     steps:
@@ -51,7 +52,7 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build ${{ matrix.module }}
-        run: ./gradlew :${{ matrix.module }}:build
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} build
       - name: capture ${{ matrix.module }} artifacts
         uses: actions/upload-artifact@v7
         with:

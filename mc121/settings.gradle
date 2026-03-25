@@ -1,0 +1,18 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'mc121'
+
+include('common')
+include('shared-mc')
+
+project(':common').projectDir = file('../common')
+project(':shared-mc').projectDir = file('../shared-mc')

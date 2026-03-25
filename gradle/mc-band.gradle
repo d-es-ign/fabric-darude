@@ -5,10 +5,11 @@ requiredProps.each { prop ->
     }
 }
 
-def sharedMainJava = rootProject.file('shared-mc/src/main/java')
-def sharedMainResources = rootProject.file('shared-mc/src/main/resources')
-def sharedClientJava = rootProject.file('shared-mc/src/client/java')
-def sharedClientResources = rootProject.file('shared-mc/src/client/resources')
+def sharedProject = project(':shared-mc')
+def sharedMainJava = sharedProject.file('src/main/java')
+def sharedMainResources = sharedProject.file('src/main/resources')
+def sharedClientJava = sharedProject.file('src/client/java')
+def sharedClientResources = sharedProject.file('src/client/resources')
 
 base {
     archivesName = "${project.archives_base_name}-${project.ext.bandSuffix}"
@@ -28,11 +29,18 @@ loom {
 dependencies {
     implementation project(':common')
 
+    def loaderVersion = project.ext.has('loaderVersion') ? project.ext.loaderVersion : (project.findProperty('loader_version') ?: rootProject.findProperty('loader_version'))
+    def junitVersion = project.ext.has('junitVersion') ? project.ext.junitVersion : (project.findProperty('junit_jupiter_version') ?: rootProject.findProperty('junit_jupiter_version'))
+
     minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
-    mappings "net.fabricmc:yarn:${project.ext.yarnMappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    if (project.ext.has('useOfficialMappings') && project.ext.useOfficialMappings) {
+        mappings loom.officialMojangMappings()
+    } else {
+        mappings "net.fabricmc:yarn:${project.ext.yarnMappings}:v2"
+    }
+    modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
-    testImplementation "org.junit.jupiter:junit-jupiter:${project.junit_jupiter_version}"
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
 }
 
 sourceSets {
@@ -94,7 +102,8 @@ tasks.named('test') {
 jar {
     inputs.property('archivesName', project.base.archivesName)
 
-    from(rootProject.file('LICENSE')) {
+    def licenseFile = file('../LICENSE').exists() ? file('../LICENSE') : rootProject.file('LICENSE')
+    from(licenseFile) {
         rename { "${it}_${inputs.properties.archivesName}" }
     }
 }
