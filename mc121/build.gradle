@@ -17,7 +17,7 @@ buildscript {
 	}
 }
 
-apply plugin: 'fabric-loom'
+apply plugin: 'net.fabricmc.fabric-loom'
 apply plugin: 'maven-publish'
 
 ext.bandSuffix = 'mc121'
