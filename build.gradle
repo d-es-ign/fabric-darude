@@ -41,6 +41,22 @@ dependencies {
 	
 }
 
+tasks.register("runAvalancheHarness", JavaExec) {
+	group = "verification"
+	description = "Runs AvalancheRedistributor harness checks"
+	dependsOn tasks.named("testClasses")
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = "com.darude.renewal.AvalancheRedistributorHarness"
+}
+
+tasks.named("check") {
+	dependsOn tasks.named("runAvalancheHarness")
+}
+
+tasks.named("test") {
+	failOnNoDiscoveredTests = false
+}
+
 processResources {
 	inputs.property "version", project.version
 
