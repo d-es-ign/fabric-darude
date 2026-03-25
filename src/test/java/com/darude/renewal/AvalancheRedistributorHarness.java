@@ -14,6 +14,9 @@ public final class AvalancheRedistributorHarness {
 	public static void main(String[] args) {
 		testAllBlockedDoesNotTopple();
 		testUnplaceableDispersesPlannedShare();
+		testAllUnplaceableRelaxesToCap();
+		testAllUnplaceableBelowThresholdDoesNotTopple();
+		testModeIgnoresUnplaceableForPureVertical();
 		testPureVerticalUsesFullDump();
 		testRemainderPrefersVerticalThenCardinal();
 		System.out.println("AvalancheRedistributor harness: OK");
@@ -47,6 +50,56 @@ public final class AvalancheRedistributorHarness {
 		check(processed == 1, "expected one topple event");
 		check(grid.getHeight(1, 1) == 1, "mixed/horizontal mode should relax to cap");
 		check(grid.getHeight(1, 0) == 1, "valid neighbor should receive only its planned share");
+	}
+
+	private static void testAllUnplaceableRelaxesToCap() {
+		TestGrid grid = new TestGrid(3, 3);
+		grid.setInitialHeight(1, 1, 8);
+
+		grid.setRule(1, 1, 1, 0, AvalancheRedistributor.NeighborState.UNPLACEABLE, 42, 1, 1);
+		grid.setRule(1, 1, 2, 1, AvalancheRedistributor.NeighborState.UNPLACEABLE, 42, 2, 2);
+		grid.setRule(1, 1, 1, 2, AvalancheRedistributor.NeighborState.BLOCKED, 0, 1, 2);
+		grid.setRule(1, 1, 0, 1, AvalancheRedistributor.NeighborState.BLOCKED, 0, 0, 1);
+
+		AvalancheRedistributor redistributor = new AvalancheRedistributor(6);
+		int processed = redistributor.redistributeBudget(grid, 1);
+
+		check(processed == 1, "all-unplaceable above threshold should consume one topple event");
+		check(grid.getHeight(1, 1) == 6, "all-unplaceable should relax to cap and disperse moved layers");
+	}
+
+	private static void testAllUnplaceableBelowThresholdDoesNotTopple() {
+		TestGrid grid = new TestGrid(3, 3);
+		grid.setInitialHeight(1, 1, 6);
+
+		grid.setRule(1, 1, 1, 0, AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, 1, 1);
+		grid.setRule(1, 1, 2, 1, AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, 2, 2);
+		grid.setRule(1, 1, 1, 2, AvalancheRedistributor.NeighborState.BLOCKED, 0, 1, 2);
+		grid.setRule(1, 1, 0, 1, AvalancheRedistributor.NeighborState.BLOCKED, 0, 0, 1);
+
+		AvalancheRedistributor redistributor = new AvalancheRedistributor(8);
+		int processed = redistributor.redistributeBudget(grid, 2);
+
+		check(processed == 0, "all-unplaceable below threshold should not topple");
+		check(grid.getHeight(1, 1) == 6, "source should remain unchanged below threshold");
+	}
+
+	private static void testModeIgnoresUnplaceableForPureVertical() {
+		TestGrid grid = new TestGrid(3, 3);
+		grid.setInitialHeight(1, 1, 8);
+
+		// One valid vertical, two unplaceable horizontal, one blocked.
+		grid.setRule(1, 1, 2, 1, AvalancheRedistributor.NeighborState.VALID, 0, 2, 2);
+		grid.setRule(1, 1, 1, 0, AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, 1, 0);
+		grid.setRule(1, 1, 1, 2, AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, 1, 2);
+		grid.setRule(1, 1, 0, 1, AvalancheRedistributor.NeighborState.BLOCKED, 0, 0, 1);
+
+		AvalancheRedistributor redistributor = new AvalancheRedistributor(6);
+		int processed = redistributor.redistributeBudget(grid, 1);
+
+		check(processed == 1, "expected one topple event");
+		check(grid.getHeight(1, 1) == 0, "mode should be pure-vertical when unplaceable is ignored");
+		check(grid.getHeight(2, 2) >= 2, "valid vertical neighbor should receive transferred layers");
 	}
 
 	private static void testPureVerticalUsesFullDump() {
