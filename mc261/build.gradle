@@ -22,12 +22,11 @@ apply plugin: 'maven-publish'
 
 ext.bandSuffix = 'mc261'
 ext.minecraftVersion = prop('minecraft_version_261')
-ext.yarnMappings = prop('yarn_mappings_261')
 ext.fabricVersion = prop('fabric_version_261')
 ext.minecraftDepRange = prop('minecraft_dep_range_261')
 ext.loaderVersion = prop('loader_version')
 ext.junitVersion = prop('junit_jupiter_version')
 ext.archivesBaseName = prop('archives_base_name')
-ext.useOfficialMappings = true
+ext.noMappings = true
 
 apply from: file('../gradle/mc-band.gradle')
