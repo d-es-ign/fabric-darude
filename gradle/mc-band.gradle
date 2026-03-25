@@ -5,7 +5,11 @@ requiredProps.each { prop ->
     }
 }
 
-def sharedProject = project(':shared-mc')
+if (!project.ext.has('sharedModule')) {
+    throw new GradleException("${project.path}: missing required ext property 'sharedModule' before applying mc-band.gradle")
+}
+
+def sharedProject = project(project.ext.sharedModule)
 def sharedMainJava = sharedProject.file('src/main/java')
 def sharedMainResources = sharedProject.file('src/main/resources')
 def sharedClientJava = sharedProject.file('src/client/java')

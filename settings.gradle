@@ -14,4 +14,5 @@ rootProject.name = 'darude'
 include('common')
 include('mc121')
 include('mc261')
-include('shared-mc')
+include('shared-mc-121')
+include('shared-mc-261')

@@ -30,7 +30,7 @@ jobs:
       - name: run common checks and harness
         run: ./gradlew --no-configuration-cache -p common check
       - name: run shared-mc verification
-        run: ./gradlew --no-configuration-cache -p shared-mc check
+        run: ./gradlew --no-configuration-cache -p shared-mc-121 check && ./gradlew --no-configuration-cache -p shared-mc-261 check
 
   build-versions:
     runs-on: ubuntu-24.04

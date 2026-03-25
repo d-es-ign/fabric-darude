@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "   ",
+    " s ",
+    "sss"
+  ],
+  "key": {
+    "s": {
+      "item": "minecraft:smooth_sandstone"
+    }
+  },
+  "result": {
+    "id": "darude:full_pyramid",
+    "count": 4
+  }
+}

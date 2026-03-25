@@ -1,0 +1,30 @@
+plugins {
+    id 'base'
+}
+
+def forbiddenVersionedPlatformImport = ~/^import\s+(static\s+)?com\.darude\.platform\.v\d+\./
+
+tasks.register('verifyNoVersionedPlatformImports') {
+    group = 'verification'
+    description = 'Fails if shared MC code imports a specific version band adapter'
+
+    doLast {
+        def violations = []
+        fileTree('src').matching { include '**/*.java' }.each { File file ->
+            file.eachLine { line ->
+                def importLine = line.trim()
+                if (importLine ==~ forbiddenVersionedPlatformImport) {
+                    violations << "${file.path}:${importLine}"
+                }
+            }
+        }
+
+        if (!violations.isEmpty()) {
+            throw new GradleException("shared-mc includes forbidden imports:\n" + violations.join('\n'))
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyNoVersionedPlatformImports')
+}

@@ -7,7 +7,12 @@ Fabric mod focused on sandstorms, renewable sand and sand layers.
 - `mc121`: Minecraft `1.21.x`
 - `mc261`: Minecraft `26.1`
 
-Shared logic lives in `common` and version-specific bootstrap/adapters live per band.
+Shared logic lives in `common`. Version-banded shared MC baselines live in:
+
+- `shared-mc-121` for `<= 1.21.x`
+- `shared-mc-261` for `>= 26.1`
+
+Version-specific bootstrap/adapters live per band module.
 
 ## Requirements
 

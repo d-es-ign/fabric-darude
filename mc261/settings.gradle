@@ -12,7 +12,7 @@ pluginManagement {
 rootProject.name = 'mc261'
 
 include('common')
-include('shared-mc')
+include('shared-mc-261')
 
 project(':common').projectDir = file('../common')
-project(':shared-mc').projectDir = file('../shared-mc')
+project(':shared-mc-261').projectDir = file('../shared-mc-261')
