@@ -19,6 +19,7 @@ public final class AvalancheRedistributorHarness {
 		testModeIgnoresUnplaceableForPureVertical();
 		testPureVerticalUsesFullDump();
 		testRemainderPrefersVerticalThenCardinal();
+		testTransferConversionCreatesSandWithRemainderOnTop();
 		System.out.println("AvalancheRedistributor harness: OK");
 	}
 
@@ -142,16 +143,41 @@ public final class AvalancheRedistributorHarness {
 		check(grid.getHeight(1, 0) == 1, "N horizontal keeps base share only");
 	}
 
+	private static void testTransferConversionCreatesSandWithRemainderOnTop() {
+		TestGrid grid = new TestGrid(3, 3);
+		grid.enableTransferConversionModel();
+		grid.setInitialHeight(1, 1, 3);
+		grid.setInitialHeight(2, 2, 14);
+
+		// Pure vertical: only E is valid vertical; others blocked.
+		grid.setRule(1, 1, 2, 1, AvalancheRedistributor.NeighborState.VALID, 0, 2, 2);
+		grid.setRule(1, 1, 1, 0, AvalancheRedistributor.NeighborState.BLOCKED, 0, 1, 0);
+		grid.setRule(1, 1, 1, 2, AvalancheRedistributor.NeighborState.BLOCKED, 0, 1, 2);
+		grid.setRule(1, 1, 0, 1, AvalancheRedistributor.NeighborState.BLOCKED, 0, 0, 1);
+
+		AvalancheRedistributor redistributor = new AvalancheRedistributor(1);
+		int processed = redistributor.redistributeBudget(grid, 1);
+
+		check(processed == 1, "expected one topple event");
+		check(grid.getHeight(1, 1) == 0, "pure-vertical transfer should full-dump source");
+		check(grid.sandBlocksAt(2, 2) == 1, "14 + 3 transfer should create one sand block");
+		check(grid.getHeight(2, 1) == 1, "conversion remainder should be placed on top cell");
+	}
+
 	private static void check(boolean condition, String message) {
 		if (!condition) throw new IllegalStateException("Harness check failed: " + message);
 	}
 
 	private static final class TestGrid implements AvalancheRedistributor.Grid {
+		private static final int LAYERS_PER_SAND_BLOCK = 16;
+
 		private final int width;
 		private final int height;
 		private final int[][] heights;
 		private final Map<String, Rule> rules = new HashMap<>();
 		private final Map<String, Integer> virtualHeights = new HashMap<>();
+		private final Map<String, Integer> sandBlocks = new HashMap<>();
+		private boolean transferConversionModelEnabled;
 
 		private TestGrid(int width, int height) {
 			this.width = width;
@@ -194,6 +220,41 @@ public final class AvalancheRedistributorHarness {
 		@Override
 		public void addTransferredLayers(int x, int y, int layers) {
 			if (layers <= 0) return;
+			if (transferConversionModelEnabled) {
+				addTransferredLayersWithConversion(x, y, layers);
+				return;
+			}
+			if (inBounds(x, y)) {
+				heights[y][x] += layers;
+				return;
+			}
+			String k = key(x, y);
+			virtualHeights.put(k, virtualHeights.getOrDefault(k, 0) + layers);
+		}
+
+		private void addTransferredLayersWithConversion(int x, int y, int layers) {
+			int total = getHeight(x, y) + layers;
+			int createdBlocks = total / LAYERS_PER_SAND_BLOCK;
+			int remainder = total % LAYERS_PER_SAND_BLOCK;
+
+			if (inBounds(x, y)) {
+				heights[y][x] = 0;
+			} else {
+				virtualHeights.put(key(x, y), 0);
+			}
+
+			if (createdBlocks > 0) {
+				String k = key(x, y);
+				sandBlocks.put(k, sandBlocks.getOrDefault(k, 0) + createdBlocks);
+			}
+
+			if (remainder > 0) {
+				addRawLayers(x, y - 1, remainder);
+			}
+		}
+
+		private void addRawLayers(int x, int y, int layers) {
+			if (layers <= 0) return;
 			if (inBounds(x, y)) {
 				heights[y][x] += layers;
 				return;
@@ -204,6 +265,10 @@ public final class AvalancheRedistributorHarness {
 
 		private void setInitialHeight(int x, int y, int layers) {
 			heights[y][x] = layers;
+		}
+
+		private void enableTransferConversionModel() {
+			transferConversionModelEnabled = true;
 		}
 
 		private void setRule(int sx, int sy, int nx, int ny, AvalancheRedistributor.NeighborState state, int deltaHeight, int tx, int ty) {
@@ -221,6 +286,10 @@ public final class AvalancheRedistributorHarness {
 
 		private int virtualHeight(int x, int y) {
 			return virtualHeights.getOrDefault(key(x, y), 0);
+		}
+
+		private int sandBlocksAt(int x, int y) {
+			return sandBlocks.getOrDefault(key(x, y), 0);
 		}
 
 		private boolean inBounds(int x, int y) {
