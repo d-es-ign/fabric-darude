@@ -1,0 +1,43 @@
+plugins {
+    id 'java-library'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+def bannedPlatformImports = ['com.darude.platform.v121', 'com.darude.platform.v261']
+
+tasks.register('verifyNoVersionedPlatformImports') {
+    group = 'verification'
+    description = 'Fails if shared MC code imports a specific version band adapter'
+
+    doLast {
+        def violations = []
+        fileTree('src').matching { include '**/*.java' }.each { File file ->
+            file.eachLine { line ->
+                if (line.trim().startsWith('import')) {
+                    bannedPlatformImports.each { banned ->
+                        if (line.contains(banned)) {
+                            violations << "${file.path}:${line.trim()}"
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!violations.isEmpty()) {
+            throw new GradleException("shared-mc includes forbidden imports:\n" + violations.join('\n'))
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyNoVersionedPlatformImports')
+}

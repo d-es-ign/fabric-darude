@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 5 ]]; then
+  echo "Usage: $0 <moduleName> <minecraftVersion> <yarnMappings> <fabricVersion> <minecraftDepRange>"
+  exit 1
+fi
+
+module_name=$1
+minecraft_version=$2
+yarn_mappings=$3
+fabric_version=$4
+minecraft_dep_range=$5
+
+if [[ ! $module_name =~ ^mc ]]; then
+  echo "Module name must start with 'mc' (e.g. mc121)"
+  exit 1
+fi
+
+module_dir=$module_name
+if [[ -d $module_dir ]]; then
+  echo "Module directory '$module_dir' already exists"
+  exit 1
+fi
+
+band_suffix=${module_name#mc}
+if [[ -z $band_suffix ]]; then
+  echo "Could not derive band suffix from module name"
+  exit 1
+fi
+
+mkdir -p "$module_dir/src/main/java/com/darude/platform/v${band_suffix}"
+mkdir -p "$module_dir/src/main/java/com/darude"
+mkdir -p "$module_dir/src/test/java/com/darude"
+
+cat <<EOF > "$module_dir/build.gradle"
+ext.bandSuffix = '${module_name}'
+ext.minecraftVersion = project.minecraft_version_${band_suffix}
+ext.yarnMappings = project.yarn_mappings_${band_suffix}
+ext.fabricVersion = project.fabric_version_${band_suffix}
+ext.minecraftDepRange = project.minecraft_dep_range_${band_suffix}
+
+apply from: rootProject.file('gradle/mc-band.gradle')
+EOF
+
+cat <<EOF > "$module_dir/src/main/java/com/darude/DarudeMod.java"
+package com.darude;
+
+import com.darude.common.DarudeCommonBootstrap;
+import com.darude.platform.v${band_suffix}.DarudePlatformAdapter${band_suffix};
+import net.fabricmc.api.ModInitializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class DarudeMod implements ModInitializer {
+    public static final String MOD_ID = "darude";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+    @Override
+    public void onInitialize() {
+        String versionBand = DarudeCommonBootstrap.initialize(new DarudePlatformAdapter${band_suffix}());
+        LOGGER.info("Darude initialized: sandstorms, renewable sand and sand layers [{}]", versionBand);
+    }
+}
+EOF
+
+cat <<EOF > "$module_dir/src/main/java/com/darude/platform/v${band_suffix}/DarudePlatformAdapter${band_suffix}.java"
+package com.darude.platform.v${band_suffix};
+
+import com.darude.DarudeBlocks;
+import com.darude.platform.DarudePlatformAdapter;
+import com.darude.worldgen.SandLayerChunkGeneration;
+import com.darude.worldgen.SandLayerGenerationConfig;
+
+public final class DarudePlatformAdapter${band_suffix} implements DarudePlatformAdapter {
+    @Override
+    public void initializeServer() {
+        DarudeBlocks.initialize();
+        SandLayerGenerationConfig.registerReloadListener();
+        SandLayerChunkGeneration.register();
+    }
+
+    @Override
+    public String versionBand() {
+        return "${minecraft_version}";
+    }
+}
+EOF
+
+cat <<EOF > "$module_dir/src/test/java/com/darude/VersionBandTest.java"
+package com.darude;
+
+import com.darude.platform.v${band_suffix}.DarudePlatformAdapter${band_suffix};
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class VersionBandTest {
+    @Test
+    void adapterReportsVersionBand() {
+        assertEquals("${minecraft_version}", new DarudePlatformAdapter${band_suffix}().versionBand());
+    }
+}
+EOF
+
+# ensure separation if file already has content
+printf '\n' >> gradle.properties
+cat <<EOF >> gradle.properties
+# Version band: ${module_name}
+minecraft_version_${band_suffix}=${minecraft_version}
+yarn_mappings_${band_suffix}=${yarn_mappings}
+fabric_version_${band_suffix}=${fabric_version}
+minecraft_dep_range_${band_suffix}=${minecraft_dep_range}
+EOF
+
+echo "Scaffolded module $module_name"
+echo "Next steps:" 
+echo "1. Add include('$module_name') to settings.gradle"
+echo "2. Add '$module_name' to the workflow matrix in .github/workflows/build.yml"

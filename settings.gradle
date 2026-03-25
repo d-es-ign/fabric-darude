@@ -10,3 +10,8 @@ pluginManagement {
 }
 
 rootProject.name = 'darude'
+
+include('common')
+include('mc121')
+include('mc261')
+include('shared-mc')

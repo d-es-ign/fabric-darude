@@ -11,7 +11,7 @@ on:
   pull_request:
 
 jobs:
-  harness:
+  common:
     runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
@@ -25,12 +25,17 @@ jobs:
           distribution: 'microsoft'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
-      - name: run avalanche harness
-        run: ./gradlew runAvalancheHarness
+      - name: validate version band registration
+        run: ./scripts/validate-version-band-registration.sh
+      - name: run common checks and harness
+        run: ./gradlew :common:check
 
-  build:
+  build-versions:
     runs-on: ubuntu-24.04
-    needs: harness
+    needs: common
+    strategy:
+      matrix:
+        module: [mc121, mc261]
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -43,12 +48,10 @@ jobs:
           distribution: 'microsoft'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
-      - name: run gradle checks
-        run: ./gradlew check -x runAvalancheHarness
-      - name: build
-        run: ./gradlew build -x check
-      - name: capture build artifacts
+      - name: build ${{ matrix.module }}
+        run: ./gradlew :${{ matrix.module }}:build
+      - name: capture ${{ matrix.module }} artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: Artifacts
-          path: build/libs/
+          name: Artifacts-${{ matrix.module }}
+          path: ${{ matrix.module }}/build/libs/

@@ -1,0 +1,7 @@
+ext.bandSuffix = 'mc121'
+ext.minecraftVersion = project.minecraft_version_121
+ext.yarnMappings = project.yarn_mappings_121
+ext.fabricVersion = project.fabric_version_121
+ext.minecraftDepRange = project.minecraft_dep_range_121
+
+apply from: rootProject.file('gradle/mc-band.gradle')

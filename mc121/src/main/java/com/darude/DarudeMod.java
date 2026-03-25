@@ -1,8 +1,8 @@
 package com.darude;
 
+import com.darude.common.DarudeCommonBootstrap;
+import com.darude.platform.v121.DarudePlatformAdapter121;
 import net.fabricmc.api.ModInitializer;
-import com.darude.worldgen.SandLayerChunkGeneration;
-import com.darude.worldgen.SandLayerGenerationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,9 +12,7 @@ public class DarudeMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		DarudeBlocks.initialize();
-		SandLayerGenerationConfig.registerReloadListener();
-		SandLayerChunkGeneration.register();
-		LOGGER.info("Darude initialized: sandstorms, renewable sand and sand layers");
+		String versionBand = DarudeCommonBootstrap.initialize(new DarudePlatformAdapter121());
+		LOGGER.info("Darude initialized: sandstorms, renewable sand and sand layers [{}]", versionBand);
 	}
 }
