@@ -35,15 +35,17 @@ jobs:
   build-versions:
     runs-on: ubuntu-24.04
     needs: common
-    continue-on-error: ${{ matrix.module == 'mc261' }}
+    continue-on-error: ${{ matrix.allow_failure }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - module: mc121
             java: '21'
+            allow_failure: false
           - module: mc261
             java: '25'
+            allow_failure: true
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
