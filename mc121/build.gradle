@@ -27,5 +27,6 @@ ext.fabricVersion = prop('fabric_version_121')
 ext.minecraftDepRange = prop('minecraft_dep_range_121')
 ext.loaderVersion = prop('loader_version')
 ext.junitVersion = prop('junit_jupiter_version')
+ext.archivesBaseName = prop('archives_base_name')
 
 apply from: file('../gradle/mc-band.gradle')

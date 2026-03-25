@@ -10,9 +10,10 @@ def sharedMainJava = sharedProject.file('src/main/java')
 def sharedMainResources = sharedProject.file('src/main/resources')
 def sharedClientJava = sharedProject.file('src/client/java')
 def sharedClientResources = sharedProject.file('src/client/resources')
+def archivesBaseName = project.ext.has('archivesBaseName') ? project.ext.archivesBaseName : (project.findProperty('archives_base_name') ?: rootProject.findProperty('archives_base_name') ?: 'darude')
 
 base {
-    archivesName = "${project.archives_base_name}-${project.ext.bandSuffix}"
+    archivesName = "${archivesBaseName}-${project.ext.bandSuffix}"
 }
 
 loom {
@@ -111,7 +112,7 @@ jar {
 publishing {
     publications {
         create('mavenJava', MavenPublication) {
-            artifactId = "${project.archives_base_name}-${project.ext.bandSuffix}"
+            artifactId = "${archivesBaseName}-${project.ext.bandSuffix}"
             from components.java
         }
     }
