@@ -21,16 +21,23 @@ settings_text = (root / "settings.gradle").read_text(encoding="utf-8")
 settings_modules = set(re.findall(r"include\('([^']+)'\)", settings_text))
 
 workflow_text = (root / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
-matrix_match = re.search(r"module:\s*\[([^\]]*)\]", workflow_text)
-if not matrix_match:
-    print("ERROR: Could not find module matrix in .github/workflows/build.yml")
-    sys.exit(1)
 
-matrix_modules = {
-    token.strip()
-    for token in matrix_match.group(1).split(",")
-    if token.strip()
-}
+# Supports both:
+# - module: [mc121, mc261]
+# - include:\n    - module: mc121\n    - module: mc261
+inline_match = re.search(r"module:\s*\[([^\]]*)\]", workflow_text)
+if inline_match:
+    matrix_modules = {
+        token.strip()
+        for token in inline_match.group(1).split(",")
+        if token.strip()
+    }
+else:
+    include_matches = re.findall(r"-\s*module:\s*([A-Za-z0-9_-]+)", workflow_text)
+    if not include_matches:
+        print("ERROR: Could not find module matrix in .github/workflows/build.yml")
+        sys.exit(1)
+    matrix_modules = set(include_matches)
 
 missing_in_settings = sorted(module_set - settings_modules)
 missing_in_matrix = sorted(module_set - matrix_modules)
