@@ -11,7 +11,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  harness:
     runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
@@ -27,6 +27,22 @@ jobs:
         run: chmod +x ./gradlew
       - name: run avalanche harness
         run: ./gradlew runAvalancheHarness
+
+  build:
+    runs-on: ubuntu-24.04
+    needs: harness
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'microsoft'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
       - name: run gradle checks
         run: ./gradlew check -x runAvalancheHarness
       - name: build

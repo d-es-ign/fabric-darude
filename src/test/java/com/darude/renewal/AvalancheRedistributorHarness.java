@@ -50,7 +50,7 @@ public final class AvalancheRedistributorHarness {
 
 		check(processed == 1, "expected one topple event");
 		check(grid.getHeight(1, 1) == 1, "mixed/horizontal mode should relax to cap");
-		check(grid.getHeight(1, 0) == 1, "valid neighbor should receive only its planned share");
+		check(grid.getHeight(1, 0) == 0, "vertical-priority remainder should route shares to unplaceable sides first");
 	}
 
 	private static void testAllUnplaceableRelaxesToCap() {
