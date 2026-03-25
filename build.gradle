@@ -9,7 +9,9 @@ allprojects {
 }
 
 subprojects {
-	apply plugin: 'java'
+	if (project.name != 'shared-mc') {
+		apply plugin: 'java'
+	}
 
 	repositories {
 		maven {
@@ -23,10 +25,12 @@ subprojects {
 		it.options.release = 21
 	}
 
-	java {
-		withSourcesJar()
-		sourceCompatibility = JavaVersion.VERSION_21
-		targetCompatibility = JavaVersion.VERSION_21
+	plugins.withId('java') {
+		java {
+			withSourcesJar()
+			sourceCompatibility = JavaVersion.VERSION_21
+			targetCompatibility = JavaVersion.VERSION_21
+		}
 	}
 }
 

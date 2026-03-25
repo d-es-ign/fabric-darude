@@ -29,6 +29,8 @@ jobs:
         run: ./scripts/validate-version-band-registration.sh
       - name: run common checks and harness
         run: ./gradlew --no-configuration-cache -p common check
+      - name: run shared-mc verification
+        run: ./gradlew :shared-mc:check
 
   build-versions:
     runs-on: ubuntu-24.04

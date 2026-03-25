@@ -1,18 +1,8 @@
 plugins {
-    id 'java-library'
+    id 'base'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
-}
-
-java {
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-def bannedPlatformImports = ['com.darude.platform.v121', 'com.darude.platform.v261']
+def forbiddenVersionedPlatformImport = ~/^import\s+(static\s+)?com\.darude\.platform\.v\d+\./
 
 tasks.register('verifyNoVersionedPlatformImports') {
     group = 'verification'
@@ -22,12 +12,9 @@ tasks.register('verifyNoVersionedPlatformImports') {
         def violations = []
         fileTree('src').matching { include '**/*.java' }.each { File file ->
             file.eachLine { line ->
-                if (line.trim().startsWith('import')) {
-                    bannedPlatformImports.each { banned ->
-                        if (line.contains(banned)) {
-                            violations << "${file.path}:${line.trim()}"
-                        }
-                    }
+                def importLine = line.trim()
+                if (importLine ==~ forbiddenVersionedPlatformImport) {
+                    violations << "${file.path}:${importLine}"
                 }
             }
         }
