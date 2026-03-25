@@ -138,7 +138,7 @@ public final class AvalancheRedistributorHarness {
 		// Remainder should go to vertical first in cardinal order: E then S.
 		check(processed == 1, "expected one topple event");
 		check(grid.getHeight(1, 1) == 6, "mixed mode should relax source to threshold");
-		check(grid.virtualHeight(2, 2) == 2, "E vertical should receive first remainder");
+		check(grid.getHeight(2, 2) == 2, "E vertical should receive first remainder");
 		check(grid.virtualHeight(1, 3) == 2, "S vertical should receive second remainder");
 		check(grid.getHeight(1, 0) == 1, "N horizontal keeps base share only");
 	}
