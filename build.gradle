@@ -53,6 +53,10 @@ tasks.named("check") {
 	dependsOn tasks.named("runAvalancheHarness")
 }
 
+tasks.named("test") {
+	failOnNoDiscoveredTests = false
+}
+
 processResources {
 	inputs.property "version", project.version
 
