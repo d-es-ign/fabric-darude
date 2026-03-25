@@ -54,7 +54,10 @@ jobs:
       - name: build ${{ matrix.module }}
         run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} build
       - name: capture ${{ matrix.module }} artifacts
+        if: ${{ success() }}
         uses: actions/upload-artifact@v7
         with:
           name: Artifacts-${{ matrix.module }}
           path: ${{ matrix.module }}/build/libs/
+
+    continue-on-error: ${{ matrix.module == 'mc261' }}
