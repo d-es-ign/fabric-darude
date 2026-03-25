@@ -1,24 +1,13 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version '1.14.10'
+	id 'maven-publish'
+}
+
 def inheritedProps = new Properties()
 file('../gradle.properties').withInputStream { inheritedProps.load(it) }
 def prop = { String key ->
 	project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
 }
-
-buildscript {
-	repositories {
-		maven {
-			name = 'Fabric'
-			url = 'https://maven.fabricmc.net/'
-		}
-		mavenCentral()
-	}
-	dependencies {
-		classpath "net.fabricmc:fabric-loom:1.14.10"
-	}
-}
-
-apply plugin: 'net.fabricmc.fabric-loom'
-apply plugin: 'maven-publish'
 
 ext.bandSuffix = 'mc261'
 ext.minecraftVersion = prop('minecraft_version_261')
