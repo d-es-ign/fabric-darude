@@ -101,8 +101,21 @@ public final class AvalancheRedistributor {
 
 		void setHeight(int x, int y, int newHeight);
 
+		/**
+		 * Resolves neighbor behavior for a candidate horizontal direction.
+		 *
+		 * target coordinates written to {@code out} are allowed to be outside
+		 * {@code [0,width) x [0,height)}.
+		 */
 		void resolveNeighbor(int sourceX, int sourceY, int neighborX, int neighborY, NeighborInfo out);
 
+		/**
+		 * Applies transferred layers at the resolved target.
+		 *
+		 * Implementations must accept out-of-bounds targets because resolved
+		 * targets may intentionally represent vertical settling outside the
+		 * current grid bounds.
+		 */
 		void addTransferredLayers(int x, int y, int layers);
 	}
 
@@ -342,9 +355,7 @@ public final class AvalancheRedistributor {
 		if (targetX == neighborX && targetY == neighborY) {
 			return DestinationType.HORIZONTAL;
 		}
-		if (targetX == neighborX && targetY == neighborY + 1) {
-			return DestinationType.VERTICAL;
-		}
+		// Any non-direct-neighbor target is treated as vertical settling.
 		return DestinationType.VERTICAL;
 	}
 
