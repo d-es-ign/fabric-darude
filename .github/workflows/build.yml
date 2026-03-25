@@ -38,7 +38,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [mc121, mc261]
+        include:
+          - module: mc121
+            java: '21'
+          - module: mc261
+            java: '25'
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -47,7 +51,7 @@ jobs:
       - name: setup jdk
         uses: actions/setup-java@v5
         with:
-          java-version: '25'
+          java-version: ${{ matrix.java }}
           distribution: 'temurin'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
