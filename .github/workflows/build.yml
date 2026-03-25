@@ -35,6 +35,7 @@ jobs:
   build-versions:
     runs-on: ubuntu-24.04
     needs: common
+    continue-on-error: ${{ matrix.module == 'mc261' }}
     strategy:
       fail-fast: false
       matrix:
@@ -63,5 +64,3 @@ jobs:
         with:
           name: Artifacts-${{ matrix.module }}
           path: ${{ matrix.module }}/build/libs/
-
-    continue-on-error: ${{ matrix.module == 'mc261' }}
