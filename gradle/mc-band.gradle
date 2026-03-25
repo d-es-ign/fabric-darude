@@ -29,11 +29,17 @@ loom {
     }
 }
 
+if (project.ext.has('noMappings') && project.ext.noMappings) {
+    minecraft {
+        version = project.ext.minecraftVersion
+        loader = loaderVersion
+    }
+}
+
 dependencies {
     implementation project(':common')
 
     if (project.ext.has('noMappings') && project.ext.noMappings) {
-        minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
         implementation "net.fabricmc:fabric-loader:${loaderVersion}"
         implementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
     } else if (project.ext.has('useOfficialMappings') && project.ext.useOfficialMappings) {
