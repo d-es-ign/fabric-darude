@@ -28,7 +28,7 @@ jobs:
       - name: validate version band registration
         run: ./scripts/validate-version-band-registration.sh
       - name: run common checks and harness
-        run: ./gradlew :common:check
+        run: ./gradlew --no-configuration-cache -p common check
 
   build-versions:
     runs-on: ubuntu-24.04
