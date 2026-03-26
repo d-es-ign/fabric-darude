@@ -1,23 +1,23 @@
 package com.darude;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.DustParticleEffect;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class SandstormClientEffects {
-	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(0xD8C48C, 1.0f);
+	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
+	private static final DustParticleOptions SAND_DUST = new DustParticleOptions(0xD8C48C, 1.0f);
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -31,8 +31,8 @@ public final class SandstormClientEffects {
 	private static Direction previousWindDirection = Direction.NORTH;
 	private static long nextWindShiftTick;
 	private static long windBlendStartTick;
-	private static ClientWorld currentWindWorld;
-	private static ClientWorld cachedSandstormWorld;
+	private static ClientLevel currentWindWorld;
+	private static ClientLevel cachedSandstormWorld;
 	private static long cachedSandstormTick = Long.MIN_VALUE;
 	private static long cachedSandstormCameraPos = Long.MIN_VALUE;
 	private static boolean cachedSandstormActive;
@@ -40,8 +40,8 @@ public final class SandstormClientEffects {
 	private SandstormClientEffects() {
 	}
 
-	public static void tick(MinecraftClient client) {
-		ClientWorld world = client.world;
+	public static void tick(Minecraft client) {
+		ClientLevel world = client.level;
 		syncWindWorld(world);
 		if (world == null) {
 			return;
@@ -55,11 +55,11 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		Random random = world.getRandom();
-		Vec3d origin = new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ());
+		RandomSource random = world.getRandom();
+		Vec3 origin = new Vec3(client.player.getX(), client.player.getY(), client.player.getZ());
 		updateWindDirection(world, random);
 
-		float rainGradient = world.getRainGradient(1.0f);
+		float rainGradient = world.getRainLevel(1.0f);
  
 		ParticleTuning tuning = getParticleTuning(client);
 		if (world.getTime() % tuning.intervalTicks != 0) {
@@ -95,11 +95,11 @@ public final class SandstormClientEffects {
 			double vy = -0.10 - random.nextDouble() * 0.06;
 			double vz = baseVz + (random.nextDouble() - 0.5) * 0.08;
 
-			client.particleManager.addParticle(SAND_DUST, x, y, z, vx, vy, vz);
+			client.particleEngine.add(SAND_DUST, x, y, z, vx, vy, vz);
 		}
 	}
 
-	private static void updateWindDirection(ClientWorld world, Random random) {
+	private static void updateWindDirection(ClientLevel world, RandomSource random) {
 		long gameTime = world.getTime();
 		if (gameTime < windBlendStartTick || gameTime < nextWindShiftTick - WIND_SHIFT_TICKS) {
 			windBlendStartTick = gameTime;
@@ -125,7 +125,7 @@ public final class SandstormClientEffects {
 		return start + (end - start) * progress;
 	}
 
-	private static ParticleTuning getParticleTuning(MinecraftClient client) {
+	private static ParticleTuning getParticleTuning(Minecraft client) {
 		Object mode = client.options.getParticles().getValue();
 		if (mode instanceof Enum<?> modeEnum) {
 			String name = modeEnum.name();
@@ -144,7 +144,7 @@ public final class SandstormClientEffects {
 	private record ParticleTuning(float densityMultiplier, int intervalTicks, int maxPerTick) {
 	}
 
-	private static void syncWindWorld(ClientWorld world) {
+	private static void syncWindWorld(ClientLevel world) {
 		if (world == currentWindWorld) {
 			return;
 		}
@@ -164,8 +164,8 @@ public final class SandstormClientEffects {
 		windBlendStartTick = gameTime;
 	}
 
-	public static float getWindTransitionProgress(MinecraftClient client) {
-		ClientWorld world = client.world;
+	public static float getWindTransitionProgress(Minecraft client) {
+		ClientLevel world = client.level;
 		if (world == null) {
 			return 0.0f;
 		}
@@ -182,7 +182,7 @@ public final class SandstormClientEffects {
 		return progress;
 	}
 
-	public static float getWindTransitionProgressIfSandstormActive(MinecraftClient client) {
+	public static float getWindTransitionProgressIfSandstormActive(Minecraft client) {
 		if (!isSandstormActive(client)) {
 			return -1.0f;
 		}
@@ -190,11 +190,11 @@ public final class SandstormClientEffects {
 		return getWindTransitionProgress(client);
 	}
 
-	public static List<String> getDebugLines(MinecraftClient client) {
+	public static List<String> getDebugLines(Minecraft client) {
 		List<String> lines = new ArrayList<>(12);
 		lines.add("[Darude] Sandstorm");
 
-		ClientWorld world = client.world;
+		ClientLevel world = client.level;
 		if (world == null || client.getCameraEntity() == null) {
 			lines.add("Active: false (no world)");
 			return lines;
@@ -206,18 +206,18 @@ public final class SandstormClientEffects {
 			client.getCameraEntity().getZ()
 		);
 
-		boolean biomeMatch = world.getBiome(cameraPos).isIn(SANDSTORM_BIOMES);
-		boolean skyVisible = world.isSkyVisible(cameraPos);
+		boolean biomeMatch = world.getBiome(cameraPos).is(SANDSTORM_BIOMES);
+		boolean skyVisible = world.canSeeSkyFromBelowWater(cameraPos);
 		boolean active = isSandstormActive(client);
 		float windProgress = getWindTransitionProgress(client);
 		ParticleTuning tuning = getParticleTuning(client);
-		float rainGradient = world.getRainGradient(1.0f);
+		float rainGradient = world.getRainLevel(1.0f);
 		int particleBudget = Math.min(Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier), tuning.maxPerTick);
 
 		lines.add("Active: " + active);
 		lines.add("Biome Match: " + biomeMatch);
 		lines.add("Sky Visible: " + skyVisible);
-		lines.add("Wind Dir: " + windDirection.asString());
+		lines.add("Wind Dir: " + windDirection.getName());
 		lines.add(String.format("Wind Transition: %.2f", windProgress));
 		lines.add("Particle Mode: " + getParticleModeName(client));
 		lines.add("Particle Budget: " + Math.max(0, particleBudget) + " (cap=" + tuning.maxPerTick + ", interval=" + tuning.intervalTicks + "t)");
@@ -226,15 +226,15 @@ public final class SandstormClientEffects {
 		return lines;
 	}
 
-	public static float getAnimatedFogStart(MinecraftClient client) {
+	public static float getAnimatedFogStart(Minecraft client) {
 		return (float) lerp(BASE_FOG_START, GUST_FOG_START, getWindTransitionProgress(client));
 	}
 
-	public static float getAnimatedFogEnd(MinecraftClient client) {
+	public static float getAnimatedFogEnd(Minecraft client) {
 		return (float) lerp(BASE_FOG_END, GUST_FOG_END, getWindTransitionProgress(client));
 	}
 
-	private static String getParticleModeName(MinecraftClient client) {
+	private static String getParticleModeName(Minecraft client) {
 		Object mode = client.options.getParticles().getValue();
 		if (mode instanceof Enum<?> modeEnum) {
 			return modeEnum.name();
@@ -243,20 +243,20 @@ public final class SandstormClientEffects {
 		return "UNKNOWN";
 	}
 
-	public static boolean isSandstormActive(MinecraftClient client) {
-		ClientWorld world = client.world;
+	public static boolean isSandstormActive(Minecraft client) {
+		ClientLevel world = client.level;
 		if (world == null || client.getCameraEntity() == null) {
 			return false;
 		}
 
 		long tick = world.getTime();
-		BlockPos cameraPos = BlockPos.ofFloored(client.getCameraEntity().getX(), client.getCameraEntity().getY(), client.getCameraEntity().getZ());
+		BlockPos cameraPos = BlockPos.containing(client.getCameraEntity().getX(), client.getCameraEntity().getY(), client.getCameraEntity().getZ());
 		long cameraPosLong = cameraPos.asLong();
 		if (world == cachedSandstormWorld && tick == cachedSandstormTick && cameraPosLong == cachedSandstormCameraPos) {
 			return cachedSandstormActive;
 		}
 
-		boolean active = isSandstormActive(world, new Vec3d(
+		boolean active = isSandstormActive(world, new Vec3(
 			client.getCameraEntity().getX(),
 			client.getCameraEntity().getY(),
 			client.getCameraEntity().getZ()
@@ -275,16 +275,16 @@ public final class SandstormClientEffects {
 		cachedSandstormActive = false;
 	}
 
-	public static boolean isSandstormActive(ClientWorld world, Vec3d cameraPos) {
+	public static boolean isSandstormActive(ClientLevel world, Vec3 cameraPos) {
 		if (!world.isRaining()) {
 			return false;
 		}
 
-		BlockPos pos = BlockPos.ofFloored(cameraPos);
-		if (!world.isSkyVisible(pos)) {
+		BlockPos pos = BlockPos.containing(cameraPos);
+		if (!world.canSeeSkyFromBelowWater(pos)) {
 			return false;
 		}
 
-		return world.getBiome(pos).isIn(SANDSTORM_BIOMES);
+		return world.getBiome(pos).is(SANDSTORM_BIOMES);
 	}
 }

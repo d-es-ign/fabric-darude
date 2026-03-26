@@ -5,24 +5,24 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 
 public final class SandLayerGenerationConfig {
-	private static final Identifier CONFIG_ID = Identifier.of(DarudeMod.MOD_ID, "worldgen/sand_layer_generation.json");
-	private static final Identifier RELOAD_LISTENER_ID = Identifier.of(DarudeMod.MOD_ID, "sand_layer_generation_config");
+	private static final Identifier CONFIG_ID = Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "worldgen/sand_layer_generation.json");
+	private static final Identifier RELOAD_LISTENER_ID = Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_generation_config");
 	private static volatile Values values = Values.defaults();
 
 	private SandLayerGenerationConfig() {
 	}
 
 	public static void registerReloadListener() {
-		ResourceManagerHelper.get(ResourceType.SERVER_DATA).registerReloadListener(new SimpleSynchronousResourceReloadListener() {
+		ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new SimpleSynchronousResourceReloadListener() {
 			@Override
 			public Identifier getFabricId() {
 				return RELOAD_LISTENER_ID;

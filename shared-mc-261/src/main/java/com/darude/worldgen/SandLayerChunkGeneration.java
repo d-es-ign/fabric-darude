@@ -4,29 +4,30 @@ import com.darude.DarudeBlocks;
 import com.darude.DarudeMod;
 import com.darude.block.SandLayerBlock;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public final class SandLayerChunkGeneration {
-	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_SUPPORT = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_support"));
-	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
+	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
+	private static final TagKey<Block> SAND_LAYER_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_support"));
+	private static final TagKey<Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
@@ -49,7 +50,7 @@ public final class SandLayerChunkGeneration {
 		ServerChunkEvents.CHUNK_GENERATE.register(SandLayerChunkGeneration::placeInGeneratedChunk);
 	}
 
-	private static void placeInGeneratedChunk(ServerWorld world, WorldChunk chunk) {
+	private static void placeInGeneratedChunk(ServerLevel world, LevelChunk chunk) {
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 		if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
 			return;
@@ -57,7 +58,7 @@ public final class SandLayerChunkGeneration {
 
 		ChunkPos chunkPos = chunk.getPos();
 		long seed = world.getSeed() ^ chunkPos.toLong();
-		Random random = Random.create(seed);
+		RandomSource random = RandomSource.create(seed);
 		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
 		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
 		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
@@ -65,27 +66,27 @@ public final class SandLayerChunkGeneration {
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
-				int x = chunkPos.getStartX() + localX;
-				int z = chunkPos.getStartZ() + localZ;
+				int x = chunkPos.getMinBlockX() + localX;
+				int z = chunkPos.getMinBlockZ() + localZ;
 				int y = getTopYNoLeaves(world, x, z, topYNoLeavesCache);
 
-				if (y < world.getBottomY() || y > world.getTopYInclusive()) {
+				if (y < world.getMinY() || y > world.getMaxY()) {
 					continue;
 				}
 
 				BlockPos placementPos = new BlockPos(x, y, z);
-				if (!world.isAir(placementPos)) {
+				if (!world.getBlockState(placementPos).isAir()) {
 					continue;
 				}
 
 				if (isInSandstormBiome(world, placementPos, biomeInSandstormCache)) {
-					if (!world.isSkyVisible(placementPos)) {
+					if (!world.canSeeSkyFromBelowWater(placementPos)) {
 						continue;
 					}
 
 					BlockPos supportPos = placementPos.down();
 					BlockState supportState = world.getBlockState(supportPos);
-					if (!supportState.isIn(SAND_LAYER_SUPPORT)) {
+					if (!supportState.is(SAND_LAYER_SUPPORT)) {
 						continue;
 					}
 
@@ -116,7 +117,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (!(world.isSkyVisible(placementPos) || isUnderLeaves(world, placementPos))) {
+				if (!(world.canSeeSkyFromBelowWater(placementPos) || isUnderLeaves(world, placementPos))) {
 					continue;
 				}
 
@@ -134,7 +135,7 @@ public final class SandLayerChunkGeneration {
 
 				BlockPos supportPos = placementPos.down();
 				BlockState supportState = world.getBlockState(supportPos);
-				if (!isNearDesertSpawnableSupport(supportState, config)) {
+				if (!isNearDesertSpawnableSupport(world, supportPos, supportState, config)) {
 					continue;
 				}
 
@@ -148,60 +149,60 @@ public final class SandLayerChunkGeneration {
 		}
 	}
 
-	private static void setSandLayers(WorldChunk chunk, BlockPos pos, int layerCount) {
+	private static void setSandLayers(LevelChunk chunk, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
-		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), 0);
+		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers), 0);
 	}
 
-	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
+	private static int countHorizontalFullBlocks(ServerLevel world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
 		int count = 0;
-		for (Direction direction : Direction.Type.HORIZONTAL) {
-			BlockPos neighborPos = center.offset(direction);
+		for (Direction direction : Direction.Plane.HORIZONTAL) {
+			BlockPos neighborPos = center.relative(direction);
 			if (!isChunkAvailableForLookup(world, neighborPos.getX(), neighborPos.getZ(), chunkAvailabilityCache)) {
 				continue;
 			}
 
-			if (neighborPos.getY() < world.getBottomY() || neighborPos.getY() > world.getTopYInclusive()) {
+			if (neighborPos.getY() < world.getMinY() || neighborPos.getY() > world.getMaxY()) {
 				continue;
 			}
 
 			BlockState state = world.getBlockState(neighborPos);
-			if (state.isOpaqueFullCube()) {
+			if (state.isCollisionShapeFullBlock(world, neighborPos)) {
 				count++;
 			}
 		}
 		return count;
 	}
 
-	private static boolean isUnderLeaves(ServerWorld world, BlockPos pos) {
+	private static boolean isUnderLeaves(ServerLevel world, BlockPos pos) {
 		int x = pos.getX();
 		int z = pos.getZ();
 
-		int topSurfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1;
+		int topSurfaceY = world.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
 		if (topSurfaceY <= pos.getY()) {
 			return false;
 		}
 
-		BlockPos.Mutable mutablePos = new BlockPos.Mutable(x, topSurfaceY, z);
+		BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos(x, topSurfaceY, z);
 		BlockState topSurfaceState = world.getBlockState(mutablePos);
-		if (!topSurfaceState.isIn(BlockTags.LEAVES)) {
+		if (!topSurfaceState.is(BlockTags.LEAVES)) {
 			return false;
 		}
 
-		int topNonLeavesY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+		int topNonLeavesY = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
 		return topNonLeavesY <= pos.getY();
 	}
 
-	private static boolean isNearDesertSpawnableSupport(BlockState state, SandLayerGenerationConfig.Values config) {
+	private static boolean isNearDesertSpawnableSupport(ServerLevel world, BlockPos pos, BlockState state, SandLayerGenerationConfig.Values config) {
 		if ("tag_only".equals(config.nearDesertSpawnableSupportMode())) {
-			return state.isIn(SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS);
+			return state.is(SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS);
 		}
 
-		return state.isOpaqueFullCube();
+		return state.isCollisionShapeFullBlock(world, pos);
 	}
 
 	public static boolean isNearDesertSand(
-		ServerWorld world,
+		ServerLevel world,
 		BlockPos pos,
 		int distance,
 		Map<Long, Boolean> chunkAvailabilityCache,
@@ -220,7 +221,7 @@ public final class SandLayerChunkGeneration {
 			return false;
 		}
 
-		BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+		BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
 		int centerX = pos.getX();
 		int centerY = pos.getY();
 		int centerZ = pos.getZ();
@@ -268,12 +269,12 @@ public final class SandLayerChunkGeneration {
 			}
 
 			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
-			if (checkY < world.getBottomY() || checkY > world.getTopYInclusive()) {
+			if (checkY < world.getMinY() || checkY > world.getMaxY()) {
 				continue;
 			}
 
 			mutablePos.set(checkX, checkY, checkZ);
-			if (world.getBlockState(mutablePos).isOf(Blocks.SAND)) {
+			if (world.getBlockState(mutablePos).is(Blocks.SAND)) {
 				nearDesertSandCache.put(columnKey, true);
 				return true;
 			}
@@ -284,12 +285,12 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static boolean hasNearbyDesertBiomeQuick(
-		ServerWorld world,
+		ServerLevel world,
 		int centerX,
 		int centerY,
 		int centerZ,
 		int distance,
-		BlockPos.Mutable mutablePos,
+		BlockPos.MutableBlockPos mutablePos,
 		Map<Long, Boolean> chunkAvailabilityCache,
 		Map<Long, Boolean> biomeInSandstormCache
 	) {
@@ -310,11 +311,11 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static boolean hasNearbySandQuick(
-		ServerWorld world,
+		ServerLevel world,
 		int centerX,
 		int centerZ,
 		int distance,
-		BlockPos.Mutable mutablePos,
+		BlockPos.MutableBlockPos mutablePos,
 		Map<Long, Boolean> chunkAvailabilityCache,
 		Map<Long, Integer> topYNoLeavesCache
 	) {
@@ -326,12 +327,12 @@ public final class SandLayerChunkGeneration {
 			}
 
 			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
-			if (checkY < world.getBottomY() || checkY > world.getTopYInclusive()) {
+			if (checkY < world.getMinY() || checkY > world.getMaxY()) {
 				continue;
 			}
 
 			mutablePos.set(checkX, checkY, checkZ);
-			if (world.getBlockState(mutablePos).isOf(Blocks.SAND)) {
+			if (world.getBlockState(mutablePos).is(Blocks.SAND)) {
 				return true;
 			}
 		}
@@ -339,7 +340,7 @@ public final class SandLayerChunkGeneration {
 		return false;
 	}
 
-	private static boolean isChunkAvailableForLookup(ServerWorld world, int blockX, int blockZ, Map<Long, Boolean> chunkAvailabilityCache) {
+	private static boolean isChunkAvailableForLookup(ServerLevel world, int blockX, int blockZ, Map<Long, Boolean> chunkAvailabilityCache) {
 		int chunkX = blockX >> 4;
 		int chunkZ = blockZ >> 4;
 		long key = ChunkPos.toLong(chunkX, chunkZ);
@@ -389,26 +390,26 @@ public final class SandLayerChunkGeneration {
 		return offsets;
 	}
 
-	private static int getTopYNoLeaves(ServerWorld world, int x, int z, Map<Long, Integer> topYNoLeavesCache) {
+	private static int getTopYNoLeaves(ServerLevel world, int x, int z, Map<Long, Integer> topYNoLeavesCache) {
 		long key = columnKey(x, z);
 		Integer cached = topYNoLeavesCache.get(key);
 		if (cached != null) {
 			return cached;
 		}
 
-		int topY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+		int topY = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
 		topYNoLeavesCache.put(key, topY);
 		return topY;
 	}
 
-	private static boolean isInSandstormBiome(ServerWorld world, BlockPos pos, Map<Long, Boolean> biomeInSandstormCache) {
+	private static boolean isInSandstormBiome(ServerLevel world, BlockPos pos, Map<Long, Boolean> biomeInSandstormCache) {
 		long key = columnKey(pos.getX(), pos.getZ());
 		Boolean cached = biomeInSandstormCache.get(key);
 		if (cached != null) {
 			return cached;
 		}
 
-		boolean inBiome = world.getBiome(pos).isIn(SANDSTORM_BIOMES);
+		boolean inBiome = world.getBiome(pos).is(SANDSTORM_BIOMES);
 		biomeInSandstormCache.put(key, inBiome);
 		return inBiome;
 	}

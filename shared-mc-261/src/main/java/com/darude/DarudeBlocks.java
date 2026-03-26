@@ -3,59 +3,53 @@ package com.darude;
 import com.darude.block.FullPyramidBlock;
 import com.darude.block.SandLayerBlock;
 import com.darude.block.PyramidBlock;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
-import net.minecraft.block.AbstractBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.piston.PistonBehavior;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.sound.BlockSoundGroup;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.PushReaction;
 
 public final class DarudeBlocks {
 	public static final Block SAND_LAYER = registerBlock("sand_layer", new SandLayerBlock(
-		AbstractBlock.Settings
-			.copy(Blocks.SAND)
-			.sounds(BlockSoundGroup.SAND)
-			.nonOpaque()
-			.pistonBehavior(PistonBehavior.DESTROY)
-			.allowsSpawning((state, world, pos, type) -> {
+		BlockBehaviour.Properties
+			.ofFullCopy(Blocks.SAND)
+			.sound(SoundType.SAND)
+			.noOcclusion()
+			.pushReaction(PushReaction.DESTROY)
+			.isValidSpawn((state, world, pos, type) -> {
 				int layers = state.get(SandLayerBlock.LAYERS);
 				return layers == 1 || layers >= 8;
 			})
 	));
 
 	public static final Block PYRAMID = registerBlock("pyramid", new PyramidBlock(
-		AbstractBlock.Settings
-			.copy(Blocks.SMOOTH_SANDSTONE)
-			.nonOpaque()
+		BlockBehaviour.Properties
+			.ofFullCopy(Blocks.SMOOTH_SANDSTONE)
+			.noOcclusion()
 	));
 
 	public static final Block FULL_PYRAMID = registerBlock("full_pyramid", new FullPyramidBlock(
-		AbstractBlock.Settings
-			.copy(Blocks.SMOOTH_SANDSTONE)
-			.nonOpaque()
+		BlockBehaviour.Properties
+			.ofFullCopy(Blocks.SMOOTH_SANDSTONE)
+			.noOcclusion()
 	));
 
 	private DarudeBlocks() {
 	}
 
 	public static void initialize() {
-		ItemGroupEvents.modifyEntriesEvent(ItemGroups.NATURAL).register(entries -> {
-			entries.add(SAND_LAYER);
-			entries.add(PYRAMID);
-			entries.add(FULL_PYRAMID);
-		});
+		// no-op for now; block/item registration is handled by static initializers.
 	}
 
 	private static Block registerBlock(String name, Block block) {
-		Identifier id = Identifier.of(DarudeMod.MOD_ID, name);
-		Registry.register(Registries.BLOCK, id, block);
-		Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
+		Identifier id = Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, name);
+		Registry.register(BuiltInRegistries.BLOCK, id, block);
+		Registry.register(BuiltInRegistries.ITEM, id, new BlockItem(block, new Item.Properties()));
 		return block;
 	}
 }

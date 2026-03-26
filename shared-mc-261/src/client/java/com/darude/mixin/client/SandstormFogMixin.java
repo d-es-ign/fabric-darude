@@ -1,11 +1,10 @@
 package com.darude.mixin.client;
 
 import com.darude.SandstormClientEffects;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.world.ClientWorld;
-import org.joml.Vector4f;
+import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
@@ -20,7 +19,7 @@ public abstract class SandstormFogMixin {
 	private static final float GUST_FOG_START = 30.0f;
 
 	@Inject(
-		method = "applyFog(Lnet/minecraft/client/render/Camera;ILnet/minecraft/client/render/RenderTickCounter;FLnet/minecraft/client/world/ClientWorld;)Lorg/joml/Vector4f;",
+		method = "setupFog(Lnet/minecraft/client/Camera;ILnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;)Lnet/minecraft/client/renderer/fog/FogData;",
 		at = @At("RETURN"),
 		cancellable = true,
 		require = 0
@@ -28,31 +27,27 @@ public abstract class SandstormFogMixin {
 	private void darude$darkenFogColor(
 		Camera camera,
 		int viewDistance,
-		RenderTickCounter tickCounter,
+		DeltaTracker tickCounter,
 		float skyDarkness,
-		ClientWorld clientWorld,
-		CallbackInfoReturnable<Vector4f> cir
+		ClientLevel clientWorld,
+		CallbackInfoReturnable<?> cir
 	) {
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
 		if (transitionProgress < 0.0f) {
 			return;
 		}
-
-		Vector4f color = new Vector4f(cir.getReturnValue());
-		float colorScale = lerp(0.78f, 0.62f, transitionProgress);
-		cir.setReturnValue(color.mul(colorScale, colorScale * 0.92f, colorScale * 0.82f, 1.0f));
 	}
 
 	@ModifyVariable(
-		method = "applyFog(Ljava/nio/ByteBuffer;ILorg/joml/Vector4f;FFFFFF)V",
+		method = "setupFog(Lnet/minecraft/client/Camera;ILnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;)Lnet/minecraft/client/renderer/fog/FogData;",
 		at = @At("HEAD"),
-		ordinal = 2,
+		ordinal = 0,
 		argsOnly = true,
 		require = 0
 	)
 	private float darude$clampRenderDistanceStart(float value) {
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
 		if (transitionProgress < 0.0f) {
 			return value;
@@ -64,14 +59,14 @@ public abstract class SandstormFogMixin {
 	}
 
 	@ModifyVariable(
-		method = "applyFog(Ljava/nio/ByteBuffer;ILorg/joml/Vector4f;FFFFFF)V",
+		method = "setupFog(Lnet/minecraft/client/Camera;ILnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;)Lnet/minecraft/client/renderer/fog/FogData;",
 		at = @At("HEAD"),
-		ordinal = 3,
+		ordinal = 1,
 		argsOnly = true,
 		require = 0
 	)
 	private float darude$clampRenderDistanceEnd(float value) {
-		MinecraftClient client = MinecraftClient.getInstance();
+		Minecraft client = Minecraft.getInstance();
 		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
 		if (transitionProgress < 0.0f) {
 			return value;
