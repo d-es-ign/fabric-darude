@@ -61,14 +61,10 @@ dependencies {
 sourceSets {
     main {
         java {
-            srcDirs = (project.ext.has('noMappings') && project.ext.noMappings)
-                ? [
-                    "${project.projectDir}/src/main/java"
-                ]
-                : [
-                    "${project.projectDir}/src/main/java",
-                    sharedMainJava
-                ]
+            srcDirs = [
+                "${project.projectDir}/src/main/java",
+                sharedMainJava
+            ]
         }
         resources {
             srcDirs = [
@@ -78,14 +74,10 @@ sourceSets {
     }
     client {
         java {
-            srcDirs = (project.ext.has('noMappings') && project.ext.noMappings)
-                ? [
-                    "${project.projectDir}/src/client/java"
-                ]
-                : [
-                    "${project.projectDir}/src/client/java",
-                    sharedClientJava
-                ]
+            srcDirs = [
+                "${project.projectDir}/src/client/java",
+                sharedClientJava
+            ]
         }
         resources {
             srcDirs = [
