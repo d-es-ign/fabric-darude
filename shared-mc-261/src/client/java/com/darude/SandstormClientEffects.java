@@ -62,7 +62,7 @@ public final class SandstormClientEffects {
 		float rainGradient = world.getRainLevel(1.0f);
  
 		ParticleTuning tuning = getParticleTuning(client);
-		if (world.getTime() % tuning.intervalTicks != 0) {
+		if (world.getGameTime() % tuning.intervalTicks != 0) {
 			return;
 		}
 
@@ -72,9 +72,9 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		float blendProgress = Math.min(1.0f, (world.getTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS);
-		double blendedWindX = lerp(previousWindDirection.getOffsetX(), windDirection.getOffsetX(), blendProgress);
-		double blendedWindZ = lerp(previousWindDirection.getOffsetZ(), windDirection.getOffsetZ(), blendProgress);
+		float blendProgress = Math.min(1.0f, (world.getGameTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS);
+		double blendedWindX = lerp(previousWindDirection.getStepX(), windDirection.getStepX(), blendProgress);
+		double blendedWindZ = lerp(previousWindDirection.getStepZ(), windDirection.getStepZ(), blendProgress);
 
 		double baseVx = blendedWindX * 0.32;
 		double baseVz = blendedWindZ * 0.32;
@@ -95,12 +95,12 @@ public final class SandstormClientEffects {
 			double vy = -0.10 - random.nextDouble() * 0.06;
 			double vz = baseVz + (random.nextDouble() - 0.5) * 0.08;
 
-			client.particleEngine.add(SAND_DUST, x, y, z, vx, vy, vz);
+			world.addParticle(SAND_DUST, x, y, z, vx, vy, vz);
 		}
 	}
 
 	private static void updateWindDirection(ClientLevel world, RandomSource random) {
-		long gameTime = world.getTime();
+		long gameTime = world.getGameTime();
 		if (gameTime < windBlendStartTick || gameTime < nextWindShiftTick - WIND_SHIFT_TICKS) {
 			windBlendStartTick = gameTime;
 			nextWindShiftTick = gameTime;
@@ -126,7 +126,7 @@ public final class SandstormClientEffects {
 	}
 
 	private static ParticleTuning getParticleTuning(Minecraft client) {
-		Object mode = client.options.getParticles().getValue();
+		Object mode = client.options.particles().get();
 		if (mode instanceof Enum<?> modeEnum) {
 			String name = modeEnum.name();
 			if ("MINIMAL".equals(name)) {
@@ -159,7 +159,7 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		long gameTime = world.getTime();
+		long gameTime = world.getGameTime();
 		nextWindShiftTick = gameTime;
 		windBlendStartTick = gameTime;
 	}
@@ -170,7 +170,7 @@ public final class SandstormClientEffects {
 			return 0.0f;
 		}
 
-		float progress = (world.getTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS;
+		float progress = (world.getGameTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS;
 		if (progress < 0.0f) {
 			return 0.0f;
 		}
@@ -200,7 +200,7 @@ public final class SandstormClientEffects {
 			return lines;
 		}
 
-		BlockPos cameraPos = BlockPos.ofFloored(
+		BlockPos cameraPos = BlockPos.containing(
 			client.getCameraEntity().getX(),
 			client.getCameraEntity().getY(),
 			client.getCameraEntity().getZ()
@@ -235,7 +235,7 @@ public final class SandstormClientEffects {
 	}
 
 	private static String getParticleModeName(Minecraft client) {
-		Object mode = client.options.getParticles().getValue();
+		Object mode = client.options.particles().get();
 		if (mode instanceof Enum<?> modeEnum) {
 			return modeEnum.name();
 		}
@@ -249,7 +249,7 @@ public final class SandstormClientEffects {
 			return false;
 		}
 
-		long tick = world.getTime();
+		long tick = world.getGameTime();
 		BlockPos cameraPos = BlockPos.containing(client.getCameraEntity().getX(), client.getCameraEntity().getY(), client.getCameraEntity().getZ());
 		long cameraPosLong = cameraPos.asLong();
 		if (world == cachedSandstormWorld && tick == cachedSandstormTick && cameraPosLong == cachedSandstormCameraPos) {
