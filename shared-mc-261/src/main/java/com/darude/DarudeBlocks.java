@@ -22,7 +22,7 @@ public final class DarudeBlocks {
 			.noOcclusion()
 			.pushReaction(PushReaction.DESTROY)
 			.isValidSpawn((state, world, pos, type) -> {
-				int layers = state.get(SandLayerBlock.LAYERS);
+				int layers = state.getValue(SandLayerBlock.LAYERS);
 				return layers == 1 || layers >= 8;
 			})
 	));

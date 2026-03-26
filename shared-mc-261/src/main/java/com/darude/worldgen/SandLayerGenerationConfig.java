@@ -29,7 +29,7 @@ public final class SandLayerGenerationConfig {
 			}
 
 			@Override
-			public void reload(ResourceManager manager) {
+			public void onResourceManagerReload(ResourceManager manager) {
 				values = load(manager);
 			}
 		});
@@ -43,7 +43,7 @@ public final class SandLayerGenerationConfig {
 		Values defaults = Values.defaults();
 		return manager.getResource(CONFIG_ID)
 			.map(resource -> {
-				try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
+				try (Reader reader = new InputStreamReader(resource.open(), StandardCharsets.UTF_8)) {
 					JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
 					float validSpotChance = root.has("valid_spot_chance")
 						? root.get("valid_spot_chance").getAsFloat()

@@ -43,9 +43,9 @@ public class SandLayerBlock extends Block implements SimpleWaterloggedBlock {
 
 	@Override
 	protected boolean canBeReplaced(BlockState state, BlockPlaceContext context) {
-		int layers = state.get(LAYERS);
+		int layers = state.getValue(LAYERS);
 		if (context.getItemInHand().is(this.asItem()) && layers < MAX_LAYERS - 1) {
-			if (context.canReplaceExisting()) {
+			if (context.replacingClickedOnBlock()) {
 				return context.getClickedFace() == Direction.UP;
 			}
 
@@ -60,7 +60,7 @@ public class SandLayerBlock extends Block implements SimpleWaterloggedBlock {
  	public BlockState getStateForPlacement(BlockPlaceContext context) {
 		BlockState currentState = context.getLevel().getBlockState(context.getClickedPos());
 		if (currentState.is(this)) {
-			int layers = currentState.get(LAYERS);
+			int layers = currentState.getValue(LAYERS);
 			if (layers >= MAX_LAYERS - 1) {
 				return Blocks.SAND.defaultBlockState();
 			}
@@ -133,7 +133,7 @@ public class SandLayerBlock extends Block implements SimpleWaterloggedBlock {
 
 	@Override
 	protected boolean canSurvive(BlockState state, LevelReader world, BlockPos pos) {
-		BlockPos belowPos = pos.down();
+		BlockPos belowPos = pos.below();
 		BlockState belowState = world.getBlockState(belowPos);
 
 		if (belowState.is(this)) {

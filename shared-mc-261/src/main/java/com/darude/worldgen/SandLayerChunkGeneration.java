@@ -57,7 +57,7 @@ public final class SandLayerChunkGeneration {
 		}
 
 		ChunkPos chunkPos = chunk.getPos();
-		long seed = world.getSeed() ^ chunkPos.toLong();
+		long seed = world.getSeed() ^ chunkPos.pack();
 		RandomSource random = RandomSource.create(seed);
 		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
 		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
@@ -84,7 +84,7 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					BlockPos supportPos = placementPos.down();
+					BlockPos supportPos = placementPos.below();
 					BlockState supportState = world.getBlockState(supportPos);
 					if (!supportState.is(SAND_LAYER_SUPPORT)) {
 						continue;
@@ -133,7 +133,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				BlockPos supportPos = placementPos.down();
+				BlockPos supportPos = placementPos.below();
 				BlockState supportState = world.getBlockState(supportPos);
 				if (!isNearDesertSpawnableSupport(world, supportPos, supportState, config)) {
 					continue;
@@ -343,7 +343,7 @@ public final class SandLayerChunkGeneration {
 	private static boolean isChunkAvailableForLookup(ServerLevel world, int blockX, int blockZ, Map<Long, Boolean> chunkAvailabilityCache) {
 		int chunkX = blockX >> 4;
 		int chunkZ = blockZ >> 4;
-		long key = ChunkPos.toLong(chunkX, chunkZ);
+		long key = ChunkPos.pack(chunkX, chunkZ);
 		Boolean cached = chunkAvailabilityCache.get(key);
 		if (cached != null) {
 			return cached;
@@ -427,7 +427,7 @@ public final class SandLayerChunkGeneration {
 			return true;
 		}
 
-		int hash = (int) (chunkPos.toLong() ^ (localX * 73428767L) ^ (localZ * 912931L));
+		int hash = (int) (chunkPos.pack() ^ (localX * 73428767L) ^ (localZ * 912931L));
 		int bucket = Math.floorMod(hash, denominator);
 		return bucket < numerator;
 	}
