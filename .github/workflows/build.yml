@@ -58,8 +58,13 @@ jobs:
         run: chmod +x ./gradlew
       - name: validate ${{ matrix.module }} resource and compile pipeline
         run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} processResources compileJava
-      - name: run ${{ matrix.module }} datagen
-        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} runDatagen
+      - name: run ${{ matrix.module }} datagen (if configured)
+        run: |
+          if ./gradlew --no-configuration-cache -p ${{ matrix.module }} help --task runDatagen >/dev/null 2>&1; then
+            ./gradlew --no-configuration-cache -p ${{ matrix.module }} runDatagen
+          else
+            printf 'runDatagen task is not configured for %s; skipping.\n' "${{ matrix.module }}"
+          fi
       - name: build ${{ matrix.module }}
         run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} build
       - name: capture ${{ matrix.module }} artifacts
