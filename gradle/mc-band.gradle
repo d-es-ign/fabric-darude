@@ -37,6 +37,7 @@ loom {
 
 dependencies {
     implementation project(':common')
+    include project(':common')
 
     if (project.ext.has('noMappings') && project.ext.noMappings) {
         minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
