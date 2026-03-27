@@ -12,12 +12,15 @@ yarn_mappings=$3
 fabric_version=$4
 minecraft_dep_range=$5
 
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(cd "$script_dir/.." && pwd)
+
 if [[ ! $module_name =~ ^mc ]]; then
   echo "Module name must start with 'mc' (e.g. mc121)"
   exit 1
 fi
 
-module_dir=$module_name
+module_dir="$repo_root/$module_name"
 if [[ -d $module_dir ]]; then
   echo "Module directory '$module_dir' already exists"
   exit 1
@@ -154,8 +157,8 @@ class VersionBandTest {
 EOF
 
 # ensure separation if file already has content
-printf '\n' >> gradle.properties
-cat <<EOF >> gradle.properties
+printf '\n' >> "$repo_root/gradle.properties"
+cat <<EOF >> "$repo_root/gradle.properties"
 # Version band: ${module_name}
 minecraft_version_${band_suffix}=${minecraft_version}
 yarn_mappings_${band_suffix}=${yarn_mappings}
