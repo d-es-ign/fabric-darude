@@ -92,6 +92,7 @@ sourceSets {
 }
 
 processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     inputs.property('version', project.version)
     inputs.property('minecraft_dep_range', project.ext.minecraftDepRange)
 
