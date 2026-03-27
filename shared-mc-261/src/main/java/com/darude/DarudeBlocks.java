@@ -3,14 +3,12 @@ package com.darude;
 import com.darude.block.FullPyramidBlock;
 import com.darude.block.SandLayerBlock;
 import com.darude.block.PyramidBlock;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -19,11 +17,6 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.PushReaction;
 
 public final class DarudeBlocks {
-	private static final ResourceKey<CreativeModeTab> NATURAL_TAB = ResourceKey.create(
-		Registries.CREATIVE_MODE_TAB,
-		Identifier.fromNamespaceAndPath("minecraft", "natural_blocks")
-	);
-
 	public static final Block SAND_LAYER = registerBlock("sand_layer", new SandLayerBlock(
 		BlockBehaviour.Properties
 			.ofFullCopy(Blocks.SAND)
@@ -52,10 +45,10 @@ public final class DarudeBlocks {
 	}
 
 	public static void initialize() {
-		ItemGroupEvents.modifyEntriesEvent(NATURAL_TAB).register(entries -> {
-			entries.accept(SAND_LAYER);
-			entries.accept(PYRAMID);
-			entries.accept(FULL_PYRAMID);
+		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.NATURAL_BLOCKS).register(output -> {
+			output.accept(SAND_LAYER);
+			output.accept(PYRAMID);
+			output.accept(FULL_PYRAMID);
 		});
 	}
 
