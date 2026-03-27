@@ -14,6 +14,8 @@ def sharedMainJava = sharedProject.file('src/main/java')
 def sharedMainResources = sharedProject.file('src/main/resources')
 def sharedClientJava = sharedProject.file('src/client/java')
 def sharedClientResources = sharedProject.file('src/client/resources')
+def moduleMainResources = file("${project.projectDir}/src/main/resources")
+def moduleClientResources = file("${project.projectDir}/src/client/resources")
 def archivesBaseName = project.ext.has('archivesBaseName') ? project.ext.archivesBaseName : (project.findProperty('archives_base_name') ?: rootProject.findProperty('archives_base_name') ?: 'darude')
 def loaderVersion = project.ext.has('loaderVersion') ? project.ext.loaderVersion : (project.findProperty('loader_version') ?: rootProject.findProperty('loader_version'))
 def junitVersion = project.ext.has('junitVersion') ? project.ext.junitVersion : (project.findProperty('junit_jupiter_version') ?: rootProject.findProperty('junit_jupiter_version'))
@@ -68,6 +70,7 @@ sourceSets {
         }
         resources {
             srcDirs = [
+                moduleMainResources,
                 sharedMainResources
             ]
         }
@@ -81,6 +84,7 @@ sourceSets {
         }
         resources {
             srcDirs = [
+                moduleClientResources,
                 sharedClientResources
             ]
         }

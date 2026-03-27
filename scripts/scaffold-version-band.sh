@@ -34,13 +34,60 @@ mkdir -p "$module_dir/src/main/java/com/darude"
 mkdir -p "$module_dir/src/test/java/com/darude"
 
 cat <<EOF > "$module_dir/build.gradle"
+def inheritedProps = new Properties()
+file('../gradle.properties').withInputStream { inheritedProps.load(it) }
+def prop = { String key ->
+    project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
+}
+
+buildscript {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "net.fabricmc:fabric-loom:1.14.10"
+    }
+}
+
+apply plugin: 'fabric-loom'
+apply plugin: 'maven-publish'
+
 ext.bandSuffix = '${module_name}'
-ext.minecraftVersion = project.minecraft_version_${band_suffix}
-ext.yarnMappings = project.yarn_mappings_${band_suffix}
-ext.fabricVersion = project.fabric_version_${band_suffix}
-ext.minecraftDepRange = project.minecraft_dep_range_${band_suffix}
+ext.minecraftVersion = prop('minecraft_version_${band_suffix}')
+ext.yarnMappings = prop('yarn_mappings_${band_suffix}')
+ext.fabricVersion = prop('fabric_version_${band_suffix}')
+ext.minecraftDepRange = prop('minecraft_dep_range_${band_suffix}')
+ext.loaderVersion = prop('loader_version')
+ext.junitVersion = prop('junit_jupiter_version')
+ext.archivesBaseName = prop('archives_base_name')
+ext.sharedModule = ':shared-mc-${band_suffix}'
 
 apply from: rootProject.file('gradle/mc-band.gradle')
+EOF
+
+cat <<EOF > "$module_dir/settings.gradle"
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'darude-${module_name}'
+
+include('common')
+include('shared-mc-${band_suffix}')
+
+project(':common').projectDir = file('../common')
+project(':shared-mc-${band_suffix}').projectDir = file('../shared-mc-${band_suffix}')
 EOF
 
 cat <<EOF > "$module_dir/src/main/java/com/darude/DarudeMod.java"
@@ -117,3 +164,4 @@ echo "Scaffolded module $module_name"
 echo "Next steps:" 
 echo "1. Add include('$module_name') to settings.gradle"
 echo "2. Add '$module_name' to the workflow matrix in .github/workflows/build.yml"
+echo "3. Create and wire shared-mc-${band_suffix} baseline module if it does not exist"

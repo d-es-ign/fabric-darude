@@ -13,7 +13,7 @@ tasks.register('verifyNoVersionedPlatformImports') {
         fileTree('src').matching { include '**/*.java' }.each { File file ->
             file.eachLine { line ->
                 def importLine = line.trim()
-                if (importLine ==~ forbiddenVersionedPlatformImport) {
+                if (importLine =~ forbiddenVersionedPlatformImport) {
                     violations << "${file.path}:${importLine}"
                 }
             }
