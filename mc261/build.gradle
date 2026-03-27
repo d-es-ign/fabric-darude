@@ -16,7 +16,7 @@ ext.minecraftDepRange = prop('minecraft_dep_range_261')
 ext.loaderVersion = prop('loader_version')
 ext.junitVersion = prop('junit_jupiter_version')
 ext.archivesBaseName = prop('archives_base_name')
-ext.useOfficialMappings = true
+ext.noMappings = true
 ext.sharedModule = ':shared-mc-261'
 
 apply from: file('../gradle/mc-band.gradle')
