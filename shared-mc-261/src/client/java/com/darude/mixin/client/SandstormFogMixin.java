@@ -2,7 +2,6 @@ package com.darude.mixin.client;
 
 import com.darude.SandstormClientEffects;
 import net.minecraft.client.Camera;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import org.joml.Vector4f;

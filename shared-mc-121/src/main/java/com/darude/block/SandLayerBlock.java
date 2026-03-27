@@ -50,7 +50,7 @@ public class SandLayerBlock extends Block implements Waterloggable {
 	@Override
 	protected boolean canReplace(BlockState state, ItemPlacementContext context) {
 		int layers = state.get(LAYERS);
-		if (context.getStack().isOf(this.asItem()) && layers < MAX_LAYERS - 1) {
+		if (context.getStack().isOf(this.asItem()) && layers < MAX_LAYERS) {
 			if (context.canReplaceExisting()) {
 				return context.getSide() == Direction.UP;
 			}

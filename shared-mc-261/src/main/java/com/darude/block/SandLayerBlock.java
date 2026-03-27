@@ -44,7 +44,7 @@ public class SandLayerBlock extends Block implements SimpleWaterloggedBlock {
 	@Override
 	protected boolean canBeReplaced(BlockState state, BlockPlaceContext context) {
 		int layers = state.getValue(LAYERS);
-		if (context.getItemInHand().is(this.asItem()) && layers < MAX_LAYERS - 1) {
+		if (context.getItemInHand().is(this.asItem()) && layers < MAX_LAYERS) {
 			if (context.replacingClickedOnBlock()) {
 				return context.getClickedFace() == Direction.UP;
 			}
