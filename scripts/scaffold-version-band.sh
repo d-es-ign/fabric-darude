@@ -40,6 +40,9 @@ def prop = { String key ->
     project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
 }
 
+group = prop('maven_group')
+version = prop('mod_version')
+
 buildscript {
     repositories {
         maven {
