@@ -5,13 +5,14 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(targets = "net.minecraft.client.render.fog.FogRenderer")
+@Mixin(targets = "net.minecraft.client.renderer.fog.FogRenderer")
 public abstract class SandstormFogMixin {
 	private static final float SANDSTORM_FOG_END = 64.0f;
 	private static final float SANDSTORM_FOG_START = 48.0f;
@@ -19,24 +20,27 @@ public abstract class SandstormFogMixin {
 	private static final float GUST_FOG_START = 30.0f;
 
 	@Inject(
-		method = "setupFog(Lnet/minecraft/client/Camera;ILnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;)Lnet/minecraft/client/renderer/fog/FogData;",
+		method = "computeFogColor(Lnet/minecraft/client/Camera;FLnet/minecraft/client/multiplayer/ClientLevel;IFLorg/joml/Vector4f;)V",
 		at = @At("RETURN"),
-		cancellable = true,
 		require = 0
 	)
 	private void darude$darkenFogColor(
 		Camera camera,
-		int viewDistance,
-		DeltaTracker tickCounter,
-		float skyDarkness,
+		float tickDelta,
 		ClientLevel clientWorld,
-		CallbackInfoReturnable<?> cir
+		int viewDistance,
+		float skyDarkness,
+		Vector4f color,
+		CallbackInfo ci
 	) {
 		Minecraft client = Minecraft.getInstance();
 		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
 		if (transitionProgress < 0.0f) {
 			return;
 		}
+
+		float colorScale = lerp(0.78f, 0.62f, transitionProgress);
+		color.mul(colorScale, colorScale * 0.92f, colorScale * 0.82f, 1.0f);
 	}
 
 	@ModifyVariable(
