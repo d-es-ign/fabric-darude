@@ -11,6 +11,30 @@ on:
   pull_request:
 
 jobs:
+  discover-modules:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: discover build modules under builds/
+        id: discover
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          entries = []
+          builds = Path("builds")
+          if builds.exists():
+              for d in sorted(builds.iterdir()):
+                  if d.is_dir() and d.name.startswith("mc") and (d / "build.gradle").exists():
+                      entries.append({"module": d.name, "module_path": str(d).replace('\\\\', '/')})
+
+          print("matrix=" + json.dumps(entries))
+          PY
+
   common:
     runs-on: ubuntu-24.04
     steps:
@@ -34,18 +58,13 @@ jobs:
 
   build-versions:
     runs-on: ubuntu-24.04
-    needs: common
+    needs: [common, discover-modules]
+    if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
     continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - module: mc121
-            module_path: builds/mc121
-            java: '21'
-          - module: mc261
-            module_path: builds/mc261
-            java: '25'
+        include: ${{ fromJSON(needs.discover-modules.outputs.matrix) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -54,7 +73,7 @@ jobs:
       - name: setup jdk
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java }}
+          java-version: '25'
           distribution: 'temurin'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
