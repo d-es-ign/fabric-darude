@@ -20,7 +20,8 @@ if [[ ! $module_name =~ ^mc ]]; then
   exit 1
 fi
 
-module_dir="$repo_root/$module_name"
+mkdir -p "$repo_root/builds"
+module_dir="$repo_root/builds/$module_name"
 if [[ -d $module_dir ]]; then
   echo "Module directory '$module_dir' already exists"
   exit 1
@@ -32,13 +33,20 @@ if [[ -z $band_suffix ]]; then
   exit 1
 fi
 
+shared_dir="shared-mc-${band_suffix}"
+if [[ "$band_suffix" == "121" ]]; then
+  shared_dir="shared-mc-121-"
+elif [[ "$band_suffix" == "261" ]]; then
+  shared_dir="shared-mc-261+"
+fi
+
 mkdir -p "$module_dir/src/main/java/com/darude/platform/v${band_suffix}"
 mkdir -p "$module_dir/src/main/java/com/darude"
 mkdir -p "$module_dir/src/test/java/com/darude"
 
 cat <<EOF > "$module_dir/build.gradle"
 def inheritedProps = new Properties()
-file('../gradle.properties').withInputStream { inheritedProps.load(it) }
+file('../../gradle.properties').withInputStream { inheritedProps.load(it) }
 def prop = { String key ->
     project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
 }
@@ -72,7 +80,7 @@ ext.junitVersion = prop('junit_jupiter_version')
 ext.archivesBaseName = prop('archives_base_name')
 ext.sharedModule = ':shared-mc-${band_suffix}'
 
-apply from: rootProject.file('gradle/mc-band.gradle')
+apply from: file('../../gradle/mc-band.gradle')
 EOF
 
 cat <<EOF > "$module_dir/settings.gradle"
@@ -92,8 +100,8 @@ rootProject.name = 'darude-${module_name}'
 include('common')
 include('shared-mc-${band_suffix}')
 
-project(':common').projectDir = file('../common')
-project(':shared-mc-${band_suffix}').projectDir = file('../shared-mc-${band_suffix}')
+project(':common').projectDir = file('../../common')
+project(':shared-mc-${band_suffix}').projectDir = file('../../${shared_dir}')
 EOF
 
 cat <<EOF > "$module_dir/src/main/java/com/darude/DarudeMod.java"
@@ -168,6 +176,6 @@ EOF
 
 echo "Scaffolded module $module_name"
 echo "Next steps:" 
-echo "1. Add include('$module_name') to settings.gradle"
+echo "1. Add include('$module_name') and projectDir mapping to settings.gradle"
 echo "2. Add '$module_name' to the workflow matrix in .github/workflows/build.yml"
 echo "3. Create and wire shared-mc-${band_suffix} baseline module if it does not exist"

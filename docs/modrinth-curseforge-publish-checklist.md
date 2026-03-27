@@ -5,14 +5,14 @@ Use this checklist every time you publish a new release.
 ## 1) Build both version-band jars
 
 ```bash
-./gradlew -p mc121 build
-./gradlew -p mc261 build
+./gradlew -p builds/mc121 build
+./gradlew -p builds/mc261 build
 ```
 
 Artifacts are generated in:
 
-- `mc121/build/libs/`
-- `mc261/build/libs/`
+- `builds/mc121/build/libs/`
+- `builds/mc261/build/libs/`
 
 ## 2) Pick the correct jar files
 

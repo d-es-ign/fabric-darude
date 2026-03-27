@@ -10,11 +10,12 @@ import sys
 
 root = Path(sys.argv[1])
 
+module_root = root / "builds"
 module_dirs = sorted(
     d.name
-    for d in root.iterdir()
+    for d in module_root.iterdir()
     if d.is_dir() and re.fullmatch(r"mc\d+", d.name) and (d / "build.gradle").exists()
-)
+) if module_root.exists() else []
 module_set = set(module_dirs)
 
 settings_text = (root / "settings.gradle").read_text(encoding="utf-8")

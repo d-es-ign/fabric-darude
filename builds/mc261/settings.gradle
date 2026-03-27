@@ -9,10 +9,10 @@ pluginManagement {
 	}
 }
 
-rootProject.name = 'mc121'
+rootProject.name = 'mc261'
 
 include('common')
-include('shared-mc-121')
+include('shared-mc-261')
 
-project(':common').projectDir = file('../common')
-project(':shared-mc-121').projectDir = file('../shared-mc-121')
+project(':common').projectDir = file('../../common')
+project(':shared-mc-261').projectDir = file('../../shared-mc-261+')

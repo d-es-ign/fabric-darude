@@ -30,7 +30,7 @@ jobs:
       - name: run common checks and harness
         run: ./gradlew --no-configuration-cache -p common check
       - name: run shared-mc verification
-        run: ./gradlew --no-configuration-cache -p shared-mc-121 check && ./gradlew --no-configuration-cache -p shared-mc-261 check
+        run: ./gradlew --no-configuration-cache -p shared-mc-121- check && ./gradlew --no-configuration-cache -p shared-mc-261+ check
 
   build-versions:
     runs-on: ubuntu-24.04
@@ -41,8 +41,10 @@ jobs:
       matrix:
         include:
           - module: mc121
+            module_path: builds/mc121
             java: '21'
           - module: mc261
+            module_path: builds/mc261
             java: '25'
     steps:
       - name: checkout repository
@@ -57,19 +59,19 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: validate ${{ matrix.module }} resource and compile pipeline
-        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} processResources compileJava
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} processResources compileJava
       - name: run ${{ matrix.module }} datagen (if configured)
         run: |
-          if ./gradlew --no-configuration-cache -p ${{ matrix.module }} help --task runDatagen >/dev/null 2>&1; then
-            ./gradlew --no-configuration-cache -p ${{ matrix.module }} runDatagen
+          if ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} help --task runDatagen >/dev/null 2>&1; then
+            ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} runDatagen
           else
             printf 'runDatagen task is not configured for %s; skipping.\n' "${{ matrix.module }}"
           fi
       - name: build ${{ matrix.module }}
-        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} build
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} build
       - name: capture ${{ matrix.module }} artifacts
         if: ${{ success() }}
         uses: actions/upload-artifact@v7
         with:
           name: Artifacts-${{ matrix.module }}
-          path: ${{ matrix.module }}/build/libs/
+          path: ${{ matrix.module_path }}/build/libs/
