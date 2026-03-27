@@ -3,7 +3,6 @@
   "ingredient": {
     "item": "minecraft:smooth_sandstone_slab"
   },
-  "result": {
-    "id": "darude:pyramid"
-  }
+  "result": "darude:pyramid",
+  "count": 1
 }
