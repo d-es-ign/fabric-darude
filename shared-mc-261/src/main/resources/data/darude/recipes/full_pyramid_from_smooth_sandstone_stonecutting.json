@@ -3,7 +3,6 @@
   "ingredient": {
     "item": "minecraft:smooth_sandstone"
   },
-  "result": {
-    "id": "darude:full_pyramid"
-  }
+  "result": "darude:full_pyramid",
+  "count": 1
 }

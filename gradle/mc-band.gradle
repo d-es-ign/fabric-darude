@@ -40,8 +40,8 @@ dependencies {
 
     if (project.ext.has('noMappings') && project.ext.noMappings) {
         minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
-        implementation "net.fabricmc:fabric-loader:${loaderVersion}"
-        implementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
+        modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
+        modImplementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
     } else if (project.ext.has('useOfficialMappings') && project.ext.useOfficialMappings) {
         minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
         mappings loom.officialMojangMappings()

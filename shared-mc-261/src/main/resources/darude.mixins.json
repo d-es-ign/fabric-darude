@@ -2,9 +2,7 @@
 	"required": true,
 	"package": "com.darude.mixin",
 	"compatibilityLevel": "JAVA_21",
-	"mixins": [
-		"DarudeMixin"
-	],
+	"mixins": [],
 	"injectors": {
 		"defaultRequire": 1
 	},

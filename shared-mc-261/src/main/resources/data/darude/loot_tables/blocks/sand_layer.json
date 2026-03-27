@@ -23,9 +23,7 @@
         {
           "condition": "minecraft:match_tool",
           "predicate": {
-            "items": [
-              "#minecraft:shovels"
-            ]
+            "tag": "minecraft:shovels"
           }
         },
         {

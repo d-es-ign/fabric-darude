@@ -16,8 +16,18 @@
 	"entrypoints": {
 		"main": [
 			"com.darude.DarudeMod"
+		],
+		"client": [
+			"com.darude.DarudeModClient"
 		]
 	},
+	"mixins": [
+		"darude.mixins.json",
+		{
+			"config": "darude.client.mixins.json",
+			"environment": "client"
+		}
+	],
 	"depends": {
 		"fabricloader": ">=0.18.2",
 		"minecraft": "${minecraft_dep_range}",
