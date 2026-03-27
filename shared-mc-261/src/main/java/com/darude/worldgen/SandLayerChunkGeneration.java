@@ -1,0 +1,434 @@
+package com.darude.worldgen;
+
+import com.darude.DarudeBlocks;
+import com.darude.DarudeMod;
+import com.darude.block.SandLayerBlock;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.Heightmap;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public final class SandLayerChunkGeneration {
+	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
+	private static final TagKey<Block> SAND_LAYER_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_support"));
+	private static final TagKey<Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
+	private static final int MAX_OFFSET_RADIUS = 8;
+	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
+	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
+	private static final int[][] QUICK_CHECK_DIRECTIONS = new int[][]{
+		{1, 0}, {-1, 0}, {0, 1}, {0, -1},
+		{1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+	};
+
+	static {
+		for (int radius = 0; radius <= MAX_OFFSET_RADIUS; radius++) {
+			CIRCLE_OFFSETS_EXCLUDE_ORIGIN[radius] = buildCircleOffsets(radius, false);
+			CIRCLE_OFFSETS_INCLUDE_ORIGIN[radius] = buildCircleOffsets(radius, true);
+		}
+	}
+
+	private SandLayerChunkGeneration() {
+	}
+
+	public static void register() {
+		ServerChunkEvents.CHUNK_GENERATE.register(SandLayerChunkGeneration::placeInGeneratedChunk);
+	}
+
+	private static void placeInGeneratedChunk(ServerLevel world, LevelChunk chunk) {
+		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
+		if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
+			return;
+		}
+
+		ChunkPos chunkPos = chunk.getPos();
+		long seed = world.getSeed() ^ chunkPos.pack();
+		RandomSource random = RandomSource.create(seed);
+		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
+		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
+		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
+		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
+
+		for (int localX = 0; localX < 16; localX++) {
+			for (int localZ = 0; localZ < 16; localZ++) {
+				int x = chunkPos.getMinBlockX() + localX;
+				int z = chunkPos.getMinBlockZ() + localZ;
+				int y = getTopYNoLeaves(world, x, z, topYNoLeavesCache);
+
+				if (y < world.getMinY() || y > world.getMaxY()) {
+					continue;
+				}
+
+				BlockPos placementPos = new BlockPos(x, y, z);
+				if (!world.getBlockState(placementPos).isAir()) {
+					continue;
+				}
+
+				if (isInSandstormBiome(world, placementPos, biomeInSandstormCache)) {
+					if (!world.canSeeSkyFromBelowWater(placementPos)) {
+						continue;
+					}
+
+					BlockPos supportPos = placementPos.below();
+					BlockState supportState = world.getBlockState(supportPos);
+					if (!supportState.is(SAND_LAYER_SUPPORT)) {
+						continue;
+					}
+
+					if (config.validSpotChance() <= 0.0f || random.nextFloat() >= config.validSpotChance()) {
+						continue;
+					}
+
+					int maximumLayers = config.baseMaxLayers();
+					int layerCount;
+					if (maximumLayers <= 1) {
+						layerCount = maximumLayers;
+					} else {
+						int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos, chunkAvailabilityCache);
+						int minimumLayers = surroundingFullBlocks / 2;
+
+						if (minimumLayers > maximumLayers) {
+							minimumLayers = maximumLayers;
+						}
+
+						layerCount = random.nextInt(maximumLayers - minimumLayers + 1) + minimumLayers;
+					}
+
+					if (layerCount <= 0) {
+						continue;
+					}
+
+					setSandLayers(chunk, placementPos, layerCount);
+					continue;
+				}
+
+				if (!(world.canSeeSkyFromBelowWater(placementPos) || isUnderLeaves(world, placementPos))) {
+					continue;
+				}
+
+				if (!shouldSampleNearDesertColumn(chunkPos, localX, localZ, config.nearDesertColumnSampleNumerator(), config.nearDesertColumnSampleDenominator())) {
+					continue;
+				}
+
+				if (config.nearDesertValidSpotChance() <= 0.0f || random.nextFloat() >= config.nearDesertValidSpotChance()) {
+					continue;
+				}
+
+				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache, nearDesertSandCache)) {
+					continue;
+				}
+
+				BlockPos supportPos = placementPos.below();
+				BlockState supportState = world.getBlockState(supportPos);
+				if (!isNearDesertSpawnableSupport(world, supportPos, supportState, config)) {
+					continue;
+				}
+
+				int layerCount = random.nextInt(config.nearDesertMaxLayers() - config.nearDesertMinLayers() + 1) + config.nearDesertMinLayers();
+				if (layerCount <= 0) {
+					continue;
+				}
+
+				setSandLayers(chunk, placementPos, layerCount);
+			}
+		}
+	}
+
+	private static void setSandLayers(LevelChunk chunk, BlockPos pos, int layerCount) {
+		int clampedLayers = Math.max(1, Math.min(15, layerCount));
+		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers), 0);
+	}
+
+	private static int countHorizontalFullBlocks(ServerLevel world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
+		int count = 0;
+		for (Direction direction : Direction.Plane.HORIZONTAL) {
+			BlockPos neighborPos = center.relative(direction);
+			if (!isChunkAvailableForLookup(world, neighborPos.getX(), neighborPos.getZ(), chunkAvailabilityCache)) {
+				continue;
+			}
+
+			if (neighborPos.getY() < world.getMinY() || neighborPos.getY() > world.getMaxY()) {
+				continue;
+			}
+
+			BlockState state = world.getBlockState(neighborPos);
+			if (state.isCollisionShapeFullBlock(world, neighborPos)) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	private static boolean isUnderLeaves(ServerLevel world, BlockPos pos) {
+		int x = pos.getX();
+		int z = pos.getZ();
+
+		int topSurfaceY = world.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+		if (topSurfaceY <= pos.getY()) {
+			return false;
+		}
+
+		BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos(x, topSurfaceY, z);
+		BlockState topSurfaceState = world.getBlockState(mutablePos);
+		if (!topSurfaceState.is(BlockTags.LEAVES)) {
+			return false;
+		}
+
+		int topNonLeavesY = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+		return topNonLeavesY <= pos.getY();
+	}
+
+	private static boolean isNearDesertSpawnableSupport(ServerLevel world, BlockPos pos, BlockState state, SandLayerGenerationConfig.Values config) {
+		if ("tag_only".equals(config.nearDesertSpawnableSupportMode())) {
+			return state.is(SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS);
+		}
+
+		return state.isCollisionShapeFullBlock(world, pos);
+	}
+
+	public static boolean isNearDesertSand(
+		ServerLevel world,
+		BlockPos pos,
+		int distance,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Boolean> biomeInSandstormCache,
+		Map<Long, Boolean> nearDesertSandCache
+	) {
+		long columnKey = columnKey(pos.getX(), pos.getZ());
+		Boolean cachedNearDesert = nearDesertSandCache.get(columnKey);
+		if (cachedNearDesert != null) {
+			return cachedNearDesert;
+		}
+
+		if (isInSandstormBiome(world, pos, biomeInSandstormCache)) {
+			nearDesertSandCache.put(columnKey, false);
+			return false;
+		}
+
+		BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+		int centerX = pos.getX();
+		int centerY = pos.getY();
+		int centerZ = pos.getZ();
+		int[][] biomeOffsets = getCircleOffsets(distance, false);
+		int[][] sandOffsets = getCircleOffsets(distance + 2, true);
+		int quickDistance = Math.max(1, distance);
+		int quickSandDistance = quickDistance + 2;
+
+		if (!hasNearbyDesertBiomeQuick(world, centerX, centerY, centerZ, quickDistance, mutablePos, chunkAvailabilityCache, biomeInSandstormCache)) {
+			nearDesertSandCache.put(columnKey, false);
+			return false;
+		}
+
+		if (hasNearbySandQuick(world, centerX, centerZ, quickSandDistance, mutablePos, chunkAvailabilityCache, topYNoLeavesCache)) {
+			nearDesertSandCache.put(columnKey, true);
+			return true;
+		}
+
+		boolean nearDesertBiome = false;
+
+		for (int[] offset : biomeOffsets) {
+			int checkX = centerX + offset[0];
+			int checkZ = centerZ + offset[1];
+			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
+				continue;
+			}
+
+			mutablePos.set(checkX, centerY, checkZ);
+			if (isInSandstormBiome(world, mutablePos, biomeInSandstormCache)) {
+				nearDesertBiome = true;
+				break;
+			}
+		}
+
+		if (!nearDesertBiome) {
+			nearDesertSandCache.put(columnKey, false);
+			return false;
+		}
+
+		for (int[] offset : sandOffsets) {
+			int checkX = centerX + offset[0];
+			int checkZ = centerZ + offset[1];
+			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
+				continue;
+			}
+
+			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
+			if (checkY < world.getMinY() || checkY > world.getMaxY()) {
+				continue;
+			}
+
+			mutablePos.set(checkX, checkY, checkZ);
+			if (world.getBlockState(mutablePos).is(Blocks.SAND)) {
+				nearDesertSandCache.put(columnKey, true);
+				return true;
+			}
+		}
+
+		nearDesertSandCache.put(columnKey, false);
+		return false;
+	}
+
+	private static boolean hasNearbyDesertBiomeQuick(
+		ServerLevel world,
+		int centerX,
+		int centerY,
+		int centerZ,
+		int distance,
+		BlockPos.MutableBlockPos mutablePos,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Boolean> biomeInSandstormCache
+	) {
+		for (int[] direction : QUICK_CHECK_DIRECTIONS) {
+			int checkX = centerX + direction[0] * distance;
+			int checkZ = centerZ + direction[1] * distance;
+			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
+				continue;
+			}
+
+			mutablePos.set(checkX, centerY, checkZ);
+			if (isInSandstormBiome(world, mutablePos, biomeInSandstormCache)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean hasNearbySandQuick(
+		ServerLevel world,
+		int centerX,
+		int centerZ,
+		int distance,
+		BlockPos.MutableBlockPos mutablePos,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache
+	) {
+		for (int[] direction : QUICK_CHECK_DIRECTIONS) {
+			int checkX = centerX + direction[0] * distance;
+			int checkZ = centerZ + direction[1] * distance;
+			if (!isChunkAvailableForLookup(world, checkX, checkZ, chunkAvailabilityCache)) {
+				continue;
+			}
+
+			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
+			if (checkY < world.getMinY() || checkY > world.getMaxY()) {
+				continue;
+			}
+
+			mutablePos.set(checkX, checkY, checkZ);
+			if (world.getBlockState(mutablePos).is(Blocks.SAND)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean isChunkAvailableForLookup(ServerLevel world, int blockX, int blockZ, Map<Long, Boolean> chunkAvailabilityCache) {
+		int chunkX = blockX >> 4;
+		int chunkZ = blockZ >> 4;
+		long key = ChunkPos.pack(chunkX, chunkZ);
+		Boolean cached = chunkAvailabilityCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		boolean available = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false) != null;
+		chunkAvailabilityCache.put(key, available);
+		return available;
+	}
+
+	private static int[][] getCircleOffsets(int radius, boolean includeOrigin) {
+		if (radius < 0) {
+			return new int[0][];
+		}
+
+		int clampedRadius = Math.min(radius, MAX_OFFSET_RADIUS);
+		return includeOrigin ? CIRCLE_OFFSETS_INCLUDE_ORIGIN[clampedRadius] : CIRCLE_OFFSETS_EXCLUDE_ORIGIN[clampedRadius];
+	}
+
+	private static int[][] buildCircleOffsets(int radius, boolean includeOrigin) {
+
+		int diameter = radius * 2 + 1;
+		int maxCount = diameter * diameter;
+		int[][] temp = new int[maxCount][];
+		int count = 0;
+		int radiusSquared = radius * radius;
+
+		for (int dx = -radius; dx <= radius; dx++) {
+			for (int dz = -radius; dz <= radius; dz++) {
+				if (!includeOrigin && dx == 0 && dz == 0) {
+					continue;
+				}
+
+				if (dx * dx + dz * dz > radiusSquared) {
+					continue;
+				}
+
+				temp[count++] = new int[]{dx, dz};
+			}
+		}
+
+		int[][] offsets = new int[count][];
+		System.arraycopy(temp, 0, offsets, 0, count);
+		return offsets;
+	}
+
+	private static int getTopYNoLeaves(ServerLevel world, int x, int z, Map<Long, Integer> topYNoLeavesCache) {
+		long key = columnKey(x, z);
+		Integer cached = topYNoLeavesCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		int topY = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+		topYNoLeavesCache.put(key, topY);
+		return topY;
+	}
+
+	private static boolean isInSandstormBiome(ServerLevel world, BlockPos pos, Map<Long, Boolean> biomeInSandstormCache) {
+		long key = columnKey(pos.getX(), pos.getZ());
+		Boolean cached = biomeInSandstormCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		boolean inBiome = world.getBiome(pos).is(SANDSTORM_BIOMES);
+		biomeInSandstormCache.put(key, inBiome);
+		return inBiome;
+	}
+
+	private static long columnKey(int x, int z) {
+		return (((long) x) << 32) ^ (z & 0xffffffffL);
+	}
+
+	private static boolean shouldSampleNearDesertColumn(ChunkPos chunkPos, int localX, int localZ, int numerator, int denominator) {
+		if (numerator <= 0) {
+			return false;
+		}
+
+		if (numerator >= denominator) {
+			return true;
+		}
+
+		int hash = (int) (chunkPos.pack() ^ (localX * 73428767L) ^ (localZ * 912931L));
+		int bucket = Math.floorMod(hash, denominator);
+		return bucket < numerator;
+	}
+}

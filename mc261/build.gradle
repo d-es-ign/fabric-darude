@@ -1,0 +1,25 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version '1.14.10'
+	id 'maven-publish'
+}
+
+def inheritedProps = new Properties()
+file('../gradle.properties').withInputStream { inheritedProps.load(it) }
+def prop = { String key ->
+	project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
+}
+
+group = prop('maven_group')
+version = prop('mod_version')
+
+ext.bandSuffix = 'mc261'
+ext.minecraftVersion = prop('minecraft_version_261')
+ext.fabricVersion = prop('fabric_version_261')
+ext.minecraftDepRange = prop('minecraft_dep_range_261')
+ext.loaderVersion = prop('loader_version')
+ext.junitVersion = prop('junit_jupiter_version')
+ext.archivesBaseName = prop('archives_base_name')
+ext.noMappings = true
+ext.sharedModule = ':shared-mc-261'
+
+apply from: file('../gradle/mc-band.gradle')

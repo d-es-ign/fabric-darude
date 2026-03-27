@@ -1,0 +1,146 @@
+def requiredProps = ['bandSuffix', 'minecraftVersion', 'fabricVersion', 'minecraftDepRange']
+requiredProps.each { prop ->
+    if (!project.ext.has(prop)) {
+        throw new GradleException("${project.path}: missing required ext property '${prop}' before applying mc-band.gradle")
+    }
+}
+
+if (!project.ext.has('sharedModule')) {
+    throw new GradleException("${project.path}: missing required ext property 'sharedModule' before applying mc-band.gradle")
+}
+
+def sharedProject = project(project.ext.sharedModule)
+def sharedMainJava = sharedProject.file('src/main/java')
+def sharedMainResources = sharedProject.file('src/main/resources')
+def sharedClientJava = sharedProject.file('src/client/java')
+def sharedClientResources = sharedProject.file('src/client/resources')
+def moduleMainResources = file("${project.projectDir}/src/main/resources")
+def moduleClientResources = file("${project.projectDir}/src/client/resources")
+def archivesBaseName = project.ext.has('archivesBaseName') ? project.ext.archivesBaseName : (project.findProperty('archives_base_name') ?: rootProject.findProperty('archives_base_name') ?: 'darude')
+def loaderVersion = project.ext.has('loaderVersion') ? project.ext.loaderVersion : (project.findProperty('loader_version') ?: rootProject.findProperty('loader_version'))
+def junitVersion = project.ext.has('junitVersion') ? project.ext.junitVersion : (project.findProperty('junit_jupiter_version') ?: rootProject.findProperty('junit_jupiter_version'))
+
+base {
+    archivesName = "${archivesBaseName}-${project.ext.bandSuffix}"
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        'darude' {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+dependencies {
+    implementation project(':common')
+    include project(':common')
+
+    if (project.ext.has('noMappings') && project.ext.noMappings) {
+        minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
+        implementation "net.fabricmc:fabric-loader:${loaderVersion}"
+        implementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
+    } else if (project.ext.has('useOfficialMappings') && project.ext.useOfficialMappings) {
+        minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
+        mappings loom.officialMojangMappings()
+        modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
+        modImplementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
+    } else {
+        minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
+        if (!project.ext.has('yarnMappings')) {
+            throw new GradleException("${project.path}: missing required ext property 'yarnMappings' when mappings are enabled")
+        }
+        mappings "net.fabricmc:yarn:${project.ext.yarnMappings}:v2"
+        modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
+        modImplementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
+    }
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = [
+                "${project.projectDir}/src/main/java",
+                sharedMainJava
+            ]
+        }
+        resources {
+            srcDirs = [
+                moduleMainResources,
+                sharedMainResources
+            ]
+        }
+    }
+    client {
+        java {
+            srcDirs = [
+                "${project.projectDir}/src/client/java",
+                sharedClientJava
+            ]
+        }
+        resources {
+            srcDirs = [
+                moduleClientResources,
+                sharedClientResources
+            ]
+        }
+    }
+}
+
+processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    inputs.property('version', project.version)
+    inputs.property('minecraft_dep_range', project.ext.minecraftDepRange)
+
+    filesMatching('fabric.mod.json') {
+        expand(
+            'version': inputs.properties.version,
+            'minecraft_dep_range': inputs.properties.minecraft_dep_range
+        )
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+tasks.withType(Jar).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    failOnNoDiscoveredTests = false
+}
+
+jar {
+    inputs.property('archivesName', project.base.archivesName)
+
+    def licenseFile = file('../LICENSE').exists() ? file('../LICENSE') : rootProject.file('LICENSE')
+    from(licenseFile) {
+        rename { "${it}_${inputs.properties.archivesName}" }
+    }
+}
+
+publishing {
+    publications {
+        create('mavenJava', MavenPublication) {
+            artifactId = "${archivesBaseName}-${project.ext.bandSuffix}"
+            from components.java
+        }
+    }
+
+    repositories {
+    }
+}
