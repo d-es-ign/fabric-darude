@@ -2,6 +2,21 @@
 
 Use this checklist every time you publish a new release.
 
+## 0) One-time CI setup
+
+Add repository secrets for the publish workflow:
+
+- `MODRINTH_PROJECT_ID`
+- `MODRINTH_TOKEN`
+- `CURSEFORGE_PROJECT_ID`
+- `CURSEFORGE_TOKEN`
+
+Workflow: `.github/workflows/publish.yml`
+
+- Manual publish: **Actions -> publish -> Run workflow**
+- Safe build-only test: run with `dry_run=true`
+- Automatic publish: publishing a GitHub Release also triggers this workflow
+
 ## 1) Build both version-band jars
 
 ```bash
