@@ -56,6 +56,10 @@ jobs:
           distribution: 'temurin'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
+      - name: validate ${{ matrix.module }} resource and compile pipeline
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} processResources compileJava
+      - name: run ${{ matrix.module }} datagen
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} runDatagen
       - name: build ${{ matrix.module }}
         run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} build
       - name: capture ${{ matrix.module }} artifacts
