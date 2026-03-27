@@ -108,6 +108,10 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
 }
 
+tasks.withType(Jar).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 java {
     withSourcesJar()
     sourceCompatibility = JavaVersion.VERSION_21
