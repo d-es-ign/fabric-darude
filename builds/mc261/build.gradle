@@ -4,7 +4,7 @@ plugins {
 }
 
 def inheritedProps = new Properties()
-file('../gradle.properties').withInputStream { inheritedProps.load(it) }
+file('../../gradle.properties').withInputStream { inheritedProps.load(it) }
 def prop = { String key ->
 	project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
 }
@@ -22,4 +22,4 @@ ext.archivesBaseName = prop('archives_base_name')
 ext.noMappings = true
 ext.sharedModule = ':shared-mc-261'
 
-apply from: file('../gradle/mc-band.gradle')
+apply from: file('../../gradle/mc-band.gradle')

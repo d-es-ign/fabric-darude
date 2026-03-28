@@ -11,6 +11,30 @@ on:
   pull_request:
 
 jobs:
+  discover-modules:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: discover build modules under builds/
+        id: discover
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          entries = []
+          builds = Path("builds")
+          if builds.exists():
+              for d in sorted(builds.iterdir()):
+                  if d.is_dir() and d.name.startswith("mc") and (d / "build.gradle").exists():
+                      entries.append({"module": d.name, "module_path": str(d).replace('\\\\', '/')})
+
+          print("matrix=" + json.dumps(entries))
+          PY
+
   common:
     runs-on: ubuntu-24.04
     steps:
@@ -30,20 +54,17 @@ jobs:
       - name: run common checks and harness
         run: ./gradlew --no-configuration-cache -p common check
       - name: run shared-mc verification
-        run: ./gradlew --no-configuration-cache -p shared-mc-121 check && ./gradlew --no-configuration-cache -p shared-mc-261 check
+        run: ./gradlew --no-configuration-cache -p shared-mc-121- check && ./gradlew --no-configuration-cache -p shared-mc-261+ check
 
   build-versions:
     runs-on: ubuntu-24.04
-    needs: common
+    needs: [common, discover-modules]
+    if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
     continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - module: mc121
-            java: '21'
-          - module: mc261
-            java: '25'
+        include: ${{ fromJSON(needs.discover-modules.outputs.matrix) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -52,24 +73,47 @@ jobs:
       - name: setup jdk
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java }}
+          java-version: '25'
           distribution: 'temurin'
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: validate ${{ matrix.module }} resource and compile pipeline
-        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} processResources compileJava
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} processResources compileJava
       - name: run ${{ matrix.module }} datagen (if configured)
         run: |
-          if ./gradlew --no-configuration-cache -p ${{ matrix.module }} help --task runDatagen >/dev/null 2>&1; then
-            ./gradlew --no-configuration-cache -p ${{ matrix.module }} runDatagen
+          if ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} help --task runDatagen >/dev/null 2>&1; then
+            ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} runDatagen
           else
             printf 'runDatagen task is not configured for %s; skipping.\n' "${{ matrix.module }}"
           fi
       - name: build ${{ matrix.module }}
-        run: ./gradlew --no-configuration-cache -p ${{ matrix.module }} build
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} build
       - name: capture ${{ matrix.module }} artifacts
         if: ${{ success() }}
         uses: actions/upload-artifact@v7
         with:
           name: Artifacts-${{ matrix.module }}
-          path: ${{ matrix.module }}/build/libs/
+          path: ${{ matrix.module_path }}/build/libs/
+
+  release-jars:
+    runs-on: ubuntu-24.04
+    needs: common
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: make scripts executable
+        run: chmod +x ./gradlew ./scripts/build-release-jars.sh
+      - name: build release jars
+        run: ./scripts/build-release-jars.sh --clean
+      - name: upload release jars
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-jars
+          path: releases/*.jar

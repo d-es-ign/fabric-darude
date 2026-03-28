@@ -16,3 +16,8 @@ include('mc121')
 include('mc261')
 include('shared-mc-121')
 include('shared-mc-261')
+
+project(':mc121').projectDir = file('builds/mc121')
+project(':mc261').projectDir = file('builds/mc261')
+project(':shared-mc-121').projectDir = file('shared-mc-121-')
+project(':shared-mc-261').projectDir = file('shared-mc-261+')

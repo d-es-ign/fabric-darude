@@ -2,17 +2,36 @@
 
 Use this checklist every time you publish a new release.
 
+## 0) One-time CI setup
+
+Add repository secrets for the publish workflow:
+
+- `MODRINTH_PROJECT_ID`
+- `MODRINTH_TOKEN`
+- `CURSEFORGE_PROJECT_ID`
+- `CURSEFORGE_TOKEN`
+
+Workflow: `.github/workflows/publish.yml`
+
+- Manual publish: **Actions -> publish -> Run workflow**
+- Safe build-only test: run with `dry_run=true`
+- Automatic publish: publishing a GitHub Release also triggers this workflow
+
 ## 1) Build both version-band jars
 
 ```bash
-./gradlew -p mc121 build
-./gradlew -p mc261 build
+./scripts/build-release-jars.sh
+```
+
+Optional: clean old local release outputs first.
+
+```bash
+./scripts/build-release-jars.sh --clean
 ```
 
 Artifacts are generated in:
 
-- `mc121/build/libs/`
-- `mc261/build/libs/`
+- `releases/`
 
 ## 2) Pick the correct jar files
 

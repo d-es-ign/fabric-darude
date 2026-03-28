@@ -10,11 +10,12 @@ import sys
 
 root = Path(sys.argv[1])
 
+module_root = root / "builds"
 module_dirs = sorted(
     d.name
-    for d in root.iterdir()
+    for d in module_root.iterdir()
     if d.is_dir() and re.fullmatch(r"mc\d+", d.name) and (d / "build.gradle").exists()
-)
+) if module_root.exists() else []
 module_set = set(module_dirs)
 
 settings_text = (root / "settings.gradle").read_text(encoding="utf-8")
@@ -25,6 +26,7 @@ workflow_text = (root / ".github" / "workflows" / "build.yml").read_text(encodin
 # Supports both:
 # - module: [mc121, mc261]
 # - include:\n    - module: mc121\n    - module: mc261
+# - dynamic include: ${{ fromJSON(needs.discover-modules.outputs.matrix) }}
 inline_match = re.search(r"module:\s*\[([^\]]*)\]", workflow_text)
 if inline_match:
     matrix_modules = {
@@ -34,10 +36,14 @@ if inline_match:
     }
 else:
     include_matches = re.findall(r"-\s*module:\s*([A-Za-z0-9_-]+)", workflow_text)
-    if not include_matches:
+    if include_matches:
+        matrix_modules = set(include_matches)
+    elif "fromJSON(needs.discover-modules.outputs.matrix)" in workflow_text:
+        # Dynamic matrix derives directly from the same discovered module set.
+        matrix_modules = set(module_dirs)
+    else:
         print("ERROR: Could not find module matrix in .github/workflows/build.yml")
         sys.exit(1)
-    matrix_modules = set(include_matches)
 
 missing_in_settings = sorted(module_set - settings_modules)
 missing_in_matrix = sorted(module_set - matrix_modules)

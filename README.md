@@ -17,14 +17,14 @@ This repository uses a version-band setup so one branch can support multiple Min
 
 | Band | Minecraft | Mappings strategy | Shared baseline |
 |---|---|---|---|
-| `mc121` | `1.21.11` | Yarn (`1.21.11+build.2`) | `shared-mc-121` |
-| `mc261` | `26.1` | no mappings / official namespace port | `shared-mc-261` |
+| `mc121` | `1.21.11` | Yarn (`1.21.11+build.2`) | `shared-mc-121-` |
+| `mc261` | `26.1` | no mappings / official namespace port | `shared-mc-261+` |
 
 ### Module layout
 
 - `common/`: version-agnostic Java logic (platform interface + avalanche redistribution/harness).
-- `mc121/`, `mc261/`: band entry modules (Loom config + platform adapters).
-- `shared-mc-121/`, `shared-mc-261/`: band-specific Minecraft implementation baselines (blocks, worldgen, mixins, client effects).
+- `builds/mc121/`, `builds/mc261/`: band entry modules (Loom config + platform adapters).
+- `shared-mc-121-/`, `shared-mc-261+/`: band-specific Minecraft implementation baselines (blocks, worldgen, mixins, client effects).
 - `gradle/mc-band.gradle`: shared build wiring for all band modules.
 
 ## Toolchain and requirements
@@ -40,7 +40,8 @@ This repository uses a version-band setup so one branch can support multiple Min
 - Run 1.21 client: `./gradlew :mc121:runClient`
 - Run 26.1 client: `./gradlew :mc261:runClient`
 - Build all modules: `./gradlew build`
-- Build one band: `./gradlew -p mc121 build` / `./gradlew -p mc261 build`
+- Build one band: `./gradlew -p builds/mc121 build` / `./gradlew -p builds/mc261 build`
+- Build local publish jars (copied to root `releases/`): `./scripts/build-release-jars.sh`
 - Run avalanche harness: `./gradlew runAvalancheHarness`
 - Validate band registration: `./scripts/validate-version-band-registration.sh`
 
