@@ -32,6 +32,10 @@ bin/
 
 run/
 
+# local release artifacts
+
+releases/
+
 # java
 
 hs_err_*.log

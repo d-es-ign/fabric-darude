@@ -41,6 +41,7 @@ This repository uses a version-band setup so one branch can support multiple Min
 - Run 26.1 client: `./gradlew :mc261:runClient`
 - Build all modules: `./gradlew build`
 - Build one band: `./gradlew -p builds/mc121 build` / `./gradlew -p builds/mc261 build`
+- Build local publish jars (copied to root `releases/`): `./scripts/build-release-jars.sh`
 - Run avalanche harness: `./gradlew runAvalancheHarness`
 - Validate band registration: `./scripts/validate-version-band-registration.sh`
 

@@ -20,14 +20,18 @@ Workflow: `.github/workflows/publish.yml`
 ## 1) Build both version-band jars
 
 ```bash
-./gradlew -p builds/mc121 build
-./gradlew -p builds/mc261 build
+./scripts/build-release-jars.sh
+```
+
+Optional: clean old local release outputs first.
+
+```bash
+./scripts/build-release-jars.sh --clean
 ```
 
 Artifacts are generated in:
 
-- `builds/mc121/build/libs/`
-- `builds/mc261/build/libs/`
+- `releases/`
 
 ## 2) Pick the correct jar files
 

@@ -94,3 +94,26 @@ jobs:
         with:
           name: Artifacts-${{ matrix.module }}
           path: ${{ matrix.module_path }}/build/libs/
+
+  release-jars:
+    runs-on: ubuntu-24.04
+    needs: common
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: make scripts executable
+        run: chmod +x ./gradlew ./scripts/build-release-jars.sh
+      - name: build release jars
+        run: ./scripts/build-release-jars.sh --clean
+      - name: upload release jars
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-jars
+          path: releases/*.jar
