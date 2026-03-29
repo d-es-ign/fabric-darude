@@ -1,277 +1,69 @@
-# Sand Layer Farming Plan V2 (Grate + Pyramid Wind Capture + Generation Avalanche)
+# Sand Layer Farming Plan V2 (Avalanche Additions)
 
-## Goal
+This document contains only the V2 additions/deltas on top of V1.
 
-Define an intentional, farmable sand-layer generation system centered on exposed copper grates and pyramid-assisted wind capture, with avalanche pressure at larger scales.
+V1 baseline (emitters, pyramid split, windward bias, fall-through, erosion, desert-origin gating) is defined in:
 
-## Design Principle
+- `docs/sand-layer-farming-plan.md`
 
-- Natural storms provide the input signal.
-- Players create output by building specific structures in valid, exposed locations.
-- Yield scales by design quality (layout, chaining, wind orientation, and stability control), not passive world drift.
+## V2 Scope
 
-## Placement Validity Rule (Applies Everywhere)
+- Keep V1 farming behavior.
+- Add generation-triggered avalanche redistribution as balancing pressure.
+- Preserve deterministic and budget-bounded behavior.
 
-For all rules below where a sand layer is created/placed:
+## New Rules Added in V2
 
-- The target must be a valid placement location.
-- Valid means the block is air or `darude:sand_layer`.
-- The block below must allow `darude:sand_layer` to exist.
-- If target already contains `darude:sand_layer`, increment layer count by one instead of replacing.
+### 1) Generation-Only Avalanche Trigger
 
-## Pyramid Erosion Rule (New in V2)
+- Avalanche work is enqueued only by successful generation increments from the farming runtime.
+- Player/manual placement does not enqueue avalanche work.
 
-- Erosion rolls only happen when pyramid-backed generation successfully creates/increments a `darude:sand_layer`.
-- If support block is `darude:full_pyramid`, roll a small chance to downgrade it to `darude:pyramid`.
-- If support block is `darude:pyramid`, roll a small chance to destroy it (replace with air).
-- This makes high-output farms require periodic maintenance.
+### 2) Global Avalanche Budget (Per Tick)
 
-## Generation-Only Avalanche Trigger Rule (New in V2)
+- Avalanche uses a global per-world budget: `max_topples_per_tick`.
+- Budget counts topple events, not individual moved layers.
+- Legacy key `avalanche_max_topples_per_increment` is accepted as a compatibility fallback when `max_topples_per_tick` is absent.
 
-- Apply sandpile instability checks only when layer count is increased through generation.
-- Player placement does not trigger avalanche processing.
-- In practice: a generated increment can push a pile into unstable state and topple into neighbors.
-- This keeps avalanche as a farming-scale balancing mechanic, not a punishment for manual building.
+### 3) Cross-Chunk Redistribution Window
 
-## Core Loop (Farming Version)
+- Avalanche processing is not limited to one chunk.
+- Runtime evaluates a 3x3 chunk window around the enqueue center to allow spill across chunk boundaries.
 
-1. **Exposed Grate Intake**
-   - A configured emitter block (default: all copper grate variants, including waxed/oxidized) that is outdoors, in a sandstorm, and surrounded by air on all sides can attempt generation.
-   - Farming is only valid in sandstorm-origin biomes (`darude:sandstorm_biomes`, e.g. desert).
-   - Base behavior: low chance to create exactly one `darude:sand_layer` directly beneath the grate.
+### 4) Neighbor Resolution and Settling
 
-2. **Pyramid-Boosted Distribution**
-   - If a pyramid block is directly below that grate, generation target changes.
-   - The grate attempts to place one `darude:sand_layer` on each horizontal side adjacent to the pyramid (N/E/S/W).
-   - The side wind is blowing against (windward side) gets a slightly increased placement chance.
+- Candidate neighbors remain cardinal (N/E/S/W).
+- When horizontal neighbor is air:
+  - if block below neighbor is `air` or `darude:sand_layer`, transfer settles below that neighbor;
+  - otherwise, transfer lands in the air neighbor cell if placement is valid.
+- Neighbor outcomes still use `VALID` / `BLOCKED` / `UNPLACEABLE` semantics.
 
-3. **Vertical Fall-Through Chaining**
-   - If a selected generation target is another valid grate cell, sand does not place there.
-   - Instead, treat that as a fall-through event and run generation logic for the lower grate instance.
-   - This enables stacked grate chains to pass sand downward until a non-grate valid target is found (or generation fails).
+### 5) Conservative Transfer Conversion
 
-4. **Avalanche Pressure from Generated Growth**
-   - After each successful generated increment, run local instability check.
-   - If local slope/height delta exceeds threshold, redistribute layers to neighbors under budget caps.
-   - Collection lanes with retaining design keep yield; bad layouts spill output into low-value cells.
+- Transfer overflow is converted conservatively:
+  - full 16-layer sets become `minecraft:sand`;
+  - remaining layers become `darude:sand_layer` above.
+- No silent truncation; loss only happens through explicit dispersal/unplaceable rules.
 
-## Avalanche Gameplay (Intentional Pressure)
+### 6) Biome Edge Spill Rule
 
-- Keep avalanche logic as a balancing force, not a passive producer.
-- When local pile differences exceed slope limits, layers redistribute and can spill away from collection lanes.
-- Well-designed channels, retaining walls, and grate drains preserve throughput.
-- Poor design bleeds production into useless redistribution.
+- Avalanche/spread deposition may cross out of `darude:sandstorm_biomes` when redistribution carries material beyond biome borders.
+- This does not relax V1 emitter-generation gating.
 
-## Structure Rules
+### 7) Storm End Behavior
 
-### Exposed Grate Qualification
+- New emitter generation still stops when storm/rain gating fails.
+- Already queued avalanche work continues until budget/queue is exhausted (no abrupt cancellation).
 
-- Grate must be outside (sky/weather exposed by existing storm checks).
-- Grate must be in a `darude:sandstorm_biomes` biome.
-- Grate must be surrounded by air horizontally and above.
-- For base mode, block below can be any valid support context for placing below-target layers.
-- For pyramid mode, block directly below grate must be a pyramid block.
+## V2 Config Additions
 
-### Pyramid Mode
+- `max_topples_per_tick` (default `256`)
 
-- A grate with `darude:pyramid` or `darude:full_pyramid` directly below enters side-placement mode.
-- Candidate cells are the four cells adjacent to the pyramid at the same Y as the pyramid top target layer.
-- Each candidate is rolled independently.
-- Windward candidate receives a configurable multiplier.
-- `darude:full_pyramid` uses a slightly higher base side-generation chance than `darude:pyramid`.
+## V2 Validation Checklist
 
-### Fall-Through Rule
-
-- If candidate target block is `minecraft:copper_grate`, do not place a layer there.
-- If that target grate is also qualified (outdoor + air-surrounded, and either no special block below or pyramid below), recursively/iteratively evaluate it as the next emitter.
-- Stop when:
-  - a non-grate valid target is placed,
-  - qualification fails,
-  - max fall-through depth is reached (safety cap).
-
-### Avalanche Rule Set
-
-- Trigger check only on generation-created increments.
-- Use configurable `slope_threshold` and height-delta rule.
-- Avalanche destination resolution uses horizontal neighbor probing with vertical settling: evaluate horizontal neighbors first, and when a neighbor is air, use that neighbor for delta checks (height = 0) and settle transferred layers into the cell directly below it.
-- Topple all layers from an unstable source and divide the transfer among horizontal neighbors where delta exceeds threshold.
-- Classify each candidate neighbor as:
-  - blocked: occupied by a non-air, non-`darude:sand_layer` block
-  - unplaceable: air (or `darude:sand_layer`) target path that still cannot accept a layer after placement checks
-  - valid: accepts transferred layers
-- Blocked neighbors do not receive layers; their share is redistributed across other valid neighbors.
-- Unplaceable neighbors cause their planned share to disperse (be lost), not redistributed.
-- If no valid neighbors exist and all candidates are blocked, no movement occurs and layers remain on the source pile.
-- If no valid neighbors exist and at least one candidate is unplaceable, all planned transfer disperses.
-- Division is deterministic: compute planned shares by equal split over all eligible delta neighbors, assign remainders by fixed cardinal order, then apply blocked/unplaceable outcomes above.
-- Transfer-time conversion is part of avalanche movement. If incoming layers would overflow `darude:sand_layer` height, convert full sets into `minecraft:sand` and place any remainder layers on top.
-- Avalanche never creates layers from nothing; movement is conservative except when layers are explicitly lost through dispersal.
-
-## Hard Anti-Passive Rules (Recommended)
-
-- No autonomous terrain-wide deposition from this farming system.
-- Generation only occurs from qualified grates during active sandstorm conditions.
-- Generation only occurs in `darude:sandstorm_biomes` (desert-origin rule).
-- Pyramid bonus requires explicit block placement directly under grate.
-- Wind bonus is modest, so orientation helps but does not dominate structure quality.
-- Avalanche is redistribution-only and generation-triggered only.
-
-## Proposed V2 Rules (Draft)
-
-### Runtime Rule Set (Concrete V2)
-
-- Tick each qualified grate at configured interval.
-- If no pyramid below:
-  - Roll `base_under_grate_chance`.
-  - On success, attempt one placement directly below.
-- If pyramid below:
-  - For each side in N/E/S/W:
-    - Roll `base_pyramid_side_chance` when support is `darude:pyramid`.
-    - Roll `full_pyramid_side_chance` when support is `darude:full_pyramid`.
-    - If side is windward, multiply by `windward_side_multiplier`.
-    - On success, attempt one placement on that side target.
-- Every placement attempt uses validity checks and fall-through handling.
-- Every successful generated increment enqueues local avalanche evaluation.
-- After each successful pyramid-backed generation:
-  - If support is `darude:full_pyramid`, roll `full_pyramid_erode_to_pyramid_chance`.
-  - If support is `darude:pyramid`, roll `pyramid_break_chance`.
-
-### Wind Handling
-
-- Windward side is derived from active storm wind vector.
-- If wind is diagonal, pick the dominant cardinal component.
-- If no reliable wind direction is available, skip windward bonus and use base chances.
-
-### Avalanche Handling (Generation-Only)
-
-- Instability evaluation runs only for cells changed by generation.
-- Player-placed layer changes do not enqueue avalanche work.
-- Process unstable cells via queue with per-tick budget.
-- `max_topples_per_tick` budgets unstable-source topple events (not individual moved layers).
-- Apply topples until local gradients return within threshold or budget is exhausted.
-
-### Safety / Performance
-
-- Use iterative fall-through (not deep recursion).
-- Cap per-source fall-through depth.
-- Cap total farming operations per tick globally.
-- Cap total avalanche topples per tick globally.
-- Process only loaded chunks and active storms.
-
-## Tuning Knobs
-
-- `farming_tick_interval_ticks`
-- `base_under_grate_chance`
-- `base_pyramid_side_chance`
-- `full_pyramid_side_chance`
-- `windward_side_multiplier`
-- `full_pyramid_erode_to_pyramid_chance`
-- `pyramid_break_chance`
-- `max_fallthrough_depth`
-- `max_farming_operations_per_tick`
-- `farming_emitters` (block tag)
-- `slope_threshold`
-- `max_topples_per_tick`
-- `avalanche_neighbor_scan_radius`
-
-## Initial Defaults (Recommended)
-
-- `farming_tick_interval_ticks = 20`
-- `base_under_grate_chance = 0.03`
-- `base_pyramid_side_chance = 0.02`
-- `full_pyramid_side_chance = 0.024`
-- `windward_side_multiplier = 1.25`
-- `full_pyramid_erode_to_pyramid_chance = 0.005`
-- `pyramid_break_chance = 0.002`
-- `max_fallthrough_depth = 12`
-- `max_farming_operations_per_tick = 512`
-- `slope_threshold = 3`
-- `max_topples_per_tick = 256`
-- `avalanche_neighbor_scan_radius = 1`
-
-## Validation Checklist (V2)
-
-- Single exposed grate in storm occasionally creates one layer directly below.
-- Same grate with pyramid below creates side layers around pyramid, with measurable windward bias.
-- Same setup using `darude:full_pyramid` produces slightly higher side-generation than `darude:pyramid`.
-- Targeting another qualifying grate triggers fall-through instead of direct placement on grate block.
-- Chained grates stop safely at depth cap and never loop infinitely.
-- Invalid targets (blocked, unsupported) correctly reject placement.
-- Repeated successful generation erodes supports (`full_pyramid -> pyramid -> air`) at configured low rates.
-- Generated increments on tall/steep piles can trigger controlled redistribution.
-- Player placement on steep piles does not trigger avalanche processing.
-- Tick cost stays within farming + avalanche operation budgets under dense farm setups.
-
-## Implementation Checklist (Code Touchpoints)
-
-Phase 1: Config and schema
-
-- [ ] Add farming config fields to `src/main/resources/data/darude/worldgen/sand_layer_generation.json`:
-  - `farming_tick_interval_ticks`
-  - `base_under_grate_chance`
-  - `base_pyramid_side_chance`
-  - `full_pyramid_side_chance`
-  - `windward_side_multiplier`
-  - `full_pyramid_erode_to_pyramid_chance`
-  - `pyramid_break_chance`
-  - `max_fallthrough_depth`
-  - `max_farming_operations_per_tick`
-  - `slope_threshold`
-  - `max_topples_per_tick`
-  - `avalanche_neighbor_scan_radius`
-- [ ] Parse and clamp fields in `src/main/java/com/darude/worldgen/SandLayerGenerationConfig.java`.
-
-Phase 2: Qualification helpers
-
-- [ ] Add grate qualification helpers in `src/main/java/com/darude/renewal/` (or existing renewal runtime package):
-  - `isQualifiedFarmingGrate(...)`
-  - `isAirSurroundedHorizontally(...)`
-  - `hasPyramidBelow(...)`
-  - `getPyramidSupportTypeBelow(...)`
-  - `isValidSandLayerTarget(...)`
-
-Phase 3: Farming runtime
-
-- [ ] Add/extend server tick handler for grate farming evaluation.
-- [ ] Implement base under-grate mode.
-- [ ] Implement pyramid side mode with windward weighting.
-- [ ] Apply support-specific rates (`pyramid` vs `full_pyramid`) for side generation.
-- [ ] Implement fall-through chain resolution with depth cap.
-- [ ] Apply erosion rolls on successful pyramid-backed generation (`full_pyramid -> pyramid`, `pyramid -> air`).
-- [ ] Register runtime from `src/main/java/com/darude/DarudeMod.java`.
-
-Phase 4: Avalanche runtime (generation-only trigger)
-
-- [ ] Add active-cell queue for instability checks in `src/main/java/com/darude/renewal/`.
-- [ ] Enqueue avalanche checks only from generation success path.
-- [ ] Exclude player placement/update events from avalanche enqueue path.
-- [ ] Implement bounded topple loop using height-delta neighbor selection.
-
-Phase 5: Verification and telemetry
-
-- [ ] Add tests/sim scenarios for base grate, pyramid mode, wind bias, and grate-chain fall-through.
-- [ ] Add erosion progression tests for `full_pyramid -> pyramid -> air`.
-- [ ] Add tests proving avalanche trigger happens on generation increments and not player placement.
-- [ ] Add debug counters:
-  - attempts
-  - successful placements
-  - fall-through traversals
-  - rejected invalid targets
-  - depth-cap terminations
-  - avalanche enqueues
-  - avalanche topples
-  - full-pyramid downgrades
-  - pyramid breaks
-
-## Success Criteria
-
-- Players can intentionally farm `darude:sand_layer` using visible structure logic.
-- Pyramid-assisted setups outperform bare grates in a predictable way.
-- `darude:full_pyramid` supports outperform `darude:pyramid` but erode over time, adding maintenance cost.
-- Wind direction provides a small but consistent optimization lever.
-- Generated high-throughput farms need stability engineering to avoid spill losses.
-- Vertical grate chains and avalanche processing remain deterministic and performance-safe.
-
-## Next Step When Resuming
-
-Implement Phase 1-3 first (config + qualification + farming runtime), then add Phase 4 generation-only avalanche queue and tune with telemetry.
+- Generated increments enqueue avalanche; manual placement does not.
+- Global per-tick topple cap is respected under dense farms.
+- Redistribution can cross chunk borders and biome borders.
+- Air-neighbor settling follows the two-branch rule (land-here vs settle-below).
+- Transfer conversion to `minecraft:sand` + layer remainder is conservative and deterministic.
+- Queued avalanche processing continues after storm ends, while new emitter generation remains blocked.
