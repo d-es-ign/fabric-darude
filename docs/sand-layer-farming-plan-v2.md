@@ -58,6 +58,7 @@ V1 baseline (emitters, pyramid split, windward bias, fall-through, erosion, dese
 ## V2 Config Additions
 
 - `max_topples_per_tick` (default `256`)
+- `avalanche_slope_threshold` (clamped safe range, default `3`)
 
 ## V2 Validation Checklist
 
