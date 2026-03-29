@@ -22,9 +22,9 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * V1 sand-layer farming runtime.
@@ -90,7 +90,7 @@ public final class SandLayerFarmingService {
 	}
 
 	private static Set<Long> collectCandidateChunks(ServerWorld world) {
-		Set<Long> chunks = new HashSet<>();
+		Set<Long> chunks = new TreeSet<>();
 		for (ServerPlayerEntity player : world.getPlayers()) {
 			ChunkPos center = player.getChunkPos();
 			for (int dz = -PLAYER_CHUNK_SCAN_RADIUS; dz <= PLAYER_CHUNK_SCAN_RADIUS; dz++) {

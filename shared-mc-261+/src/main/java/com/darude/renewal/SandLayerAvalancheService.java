@@ -246,20 +246,32 @@ public final class SandLayerAvalancheService {
 		}
 
 		private void setColumnHeightAt(BlockPos pos, int desiredHeight) {
+			if (!isWithinBuildHeight(pos.getY())) {
+				return;
+			}
+
 			clearSandMassAbove(pos);
 
 			int remaining = Math.max(0, desiredHeight);
 			BlockPos.MutableBlockPos cursor = pos.mutable();
 
 			while (remaining > 0) {
+				if (!isWithinBuildHeight(cursor.getY())) {
+					return;
+				}
+
 				if (remaining >= 16) {
-					world.setBlock(cursor, Blocks.SAND.defaultBlockState(), 3);
+					if (!world.setBlock(cursor, Blocks.SAND.defaultBlockState(), 3)) {
+						return;
+					}
 					remaining -= 16;
 					cursor.move(0, 1, 0);
 					continue;
 				}
 
-				world.setBlock(cursor, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, remaining), 3);
+				if (!world.setBlock(cursor, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, remaining), 3)) {
+					return;
+				}
 				remaining = 0;
 			}
 
@@ -292,12 +304,18 @@ public final class SandLayerAvalancheService {
 		private void clearSandMassAbove(BlockPos pos) {
 			BlockPos.MutableBlockPos cursor = pos.mutable();
 			while (true) {
+				if (!isWithinBuildHeight(cursor.getY())) {
+					return;
+				}
+
 				BlockState state = world.getBlockState(cursor);
 				if (!isSandMass(state)) {
 					return;
 				}
 
-				world.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3);
+				if (!world.setBlock(cursor, Blocks.AIR.defaultBlockState(), 3)) {
+					return;
+				}
 				cursor.move(0, 1, 0);
 			}
 		}
@@ -307,6 +325,10 @@ public final class SandLayerAvalancheService {
 			int remaining = layers;
 
 			while (remaining > 0) {
+				if (!isWithinBuildHeight(cursor.getY())) {
+					return;
+				}
+
 				BlockState state = world.getBlockState(cursor);
 				if (state.is(Blocks.SAND)) {
 					cursor.move(0, 1, 0);
@@ -317,11 +339,15 @@ public final class SandLayerAvalancheService {
 					int current = state.getValue(SandLayerBlock.LAYERS);
 					int total = current + remaining;
 					if (total <= 15) {
-						world.setBlock(cursor, state.setValue(SandLayerBlock.LAYERS, total), 3);
+						if (!world.setBlock(cursor, state.setValue(SandLayerBlock.LAYERS, total), 3)) {
+							return;
+						}
 						return;
 					}
 
-					world.setBlock(cursor, Blocks.SAND.defaultBlockState(), 3);
+					if (!world.setBlock(cursor, Blocks.SAND.defaultBlockState(), 3)) {
+						return;
+					}
 					remaining = total - 16;
 					cursor.move(0, 1, 0);
 					continue;
@@ -336,26 +362,26 @@ public final class SandLayerAvalancheService {
 				}
 
 				if (remaining >= 16) {
-					world.setBlock(cursor, Blocks.SAND.defaultBlockState(), 3);
+					if (!world.setBlock(cursor, Blocks.SAND.defaultBlockState(), 3)) {
+						return;
+					}
 					remaining -= 16;
 					cursor.move(0, 1, 0);
 				} else {
-					world.setBlock(cursor, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, remaining), 3);
+					if (!world.setBlock(cursor, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, remaining), 3)) {
+						return;
+					}
 					return;
 				}
 			}
 		}
 
-		private BlockPos worldPos(int x, int z, int yLevel) {
-			return new BlockPos(minX + x, yLevel, minZ + z);
+		private boolean isWithinBuildHeight(int yLevel) {
+			return yLevel >= world.getMinY() && yLevel <= world.getMaxY() - 1;
 		}
 
-		private static int sandHeightFor(BlockState state) {
-			if (state.is(DarudeBlocks.SAND_LAYER)) {
-				return state.getValue(SandLayerBlock.LAYERS);
-			}
-
-			return state.is(Blocks.SAND) ? 16 : 0;
+		private BlockPos worldPos(int x, int z, int yLevel) {
+			return new BlockPos(minX + x, yLevel, minZ + z);
 		}
 
 		private static boolean isSandMass(BlockState state) {

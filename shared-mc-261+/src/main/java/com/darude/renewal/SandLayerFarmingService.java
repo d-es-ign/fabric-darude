@@ -23,9 +23,9 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * V1 sand-layer farming runtime.
@@ -95,7 +95,7 @@ public final class SandLayerFarmingService {
 	}
 
 	private static Set<Long> collectCandidateChunks(ServerLevel world) {
-		Set<Long> chunks = new HashSet<>();
+		Set<Long> chunks = new TreeSet<>();
 		for (ServerPlayer player : world.players()) {
 			ChunkPos center = player.chunkPosition();
 			for (int dz = -PLAYER_CHUNK_SCAN_RADIUS; dz <= PLAYER_CHUNK_SCAN_RADIUS; dz++) {
