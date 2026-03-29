@@ -2,6 +2,7 @@ package com.darude.renewal;
 
 import com.darude.DarudeBlocks;
 import com.darude.block.SandLayerBlock;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import com.darude.worldgen.SandLayerGenerationConfig;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.BlockState;
@@ -38,6 +39,10 @@ public final class SandLayerAvalancheService {
 		}
 
 		ServerTickEvents.END_WORLD_TICK.register(SandLayerAvalancheService::onEndWorldTick);
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+			QUEUES.clear();
+			QUEUED_KEYS.clear();
+		});
 		registered = true;
 	}
 
@@ -69,6 +74,7 @@ public final class SandLayerAvalancheService {
 
 		Set<Long> queued = QUEUED_KEYS.get(key);
 		int processedCenters = 0;
+		AvalancheRedistributor redistributor = new AvalancheRedistributor(config.avalancheSlopeThreshold());
 		while (remainingBudget > 0 && processedCenters < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty()) {
 			BlockPos center = queue.poll();
 			if (queued != null) {
@@ -81,7 +87,6 @@ public final class SandLayerAvalancheService {
 				continue;
 			}
 
-			AvalancheRedistributor redistributor = new AvalancheRedistributor(config.avalancheSlopeThreshold());
 			int processedTopples = redistributor.redistributeBudget(grid, remainingBudget);
 			remainingBudget -= processedTopples;
 			processedCenters++;
@@ -214,7 +219,7 @@ public final class SandLayerAvalancheService {
 		private void loadHeights() {
 			for (int z = 0; z < height; z++) {
 				for (int x = 0; x < width; x++) {
-					heights[indexOf(x, z)] = sandHeightFor(world.getBlockState(worldPos(x, z, y)));
+					heights[indexOf(x, z)] = readColumnHeightAt(worldPos(x, z, y));
 				}
 			}
 		}
@@ -233,6 +238,8 @@ public final class SandLayerAvalancheService {
 		}
 
 		private void setColumnHeightAt(BlockPos pos, int desiredHeight) {
+			clearSandMassAbove(pos);
+
 			int remaining = Math.max(0, desiredHeight);
 			BlockPos.Mutable cursor = pos.mutableCopy();
 
@@ -250,6 +257,40 @@ public final class SandLayerAvalancheService {
 
 			if (desiredHeight == 0) {
 				world.setBlockState(pos, Blocks.AIR.getDefaultState(), 3);
+			}
+		}
+
+		private int readColumnHeightAt(BlockPos pos) {
+			int total = 0;
+			BlockPos.Mutable cursor = pos.mutableCopy();
+			while (true) {
+				BlockState state = world.getBlockState(cursor);
+				if (state.isOf(Blocks.SAND)) {
+					total += 16;
+					cursor.move(0, 1, 0);
+					continue;
+				}
+
+				if (state.isOf(DarudeBlocks.SAND_LAYER)) {
+					total += state.get(SandLayerBlock.LAYERS);
+					cursor.move(0, 1, 0);
+					continue;
+				}
+
+				return total;
+			}
+		}
+
+		private void clearSandMassAbove(BlockPos pos) {
+			BlockPos.Mutable cursor = pos.mutableCopy();
+			while (true) {
+				BlockState state = world.getBlockState(cursor);
+				if (!isSandMass(state)) {
+					return;
+				}
+
+				world.setBlockState(cursor, Blocks.AIR.getDefaultState(), 3);
+				cursor.move(0, 1, 0);
 			}
 		}
 

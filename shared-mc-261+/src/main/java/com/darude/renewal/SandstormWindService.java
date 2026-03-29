@@ -1,6 +1,7 @@
 package com.darude.renewal;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -27,6 +28,7 @@ public final class SandstormWindService {
 				tickWorld(world);
 			}
 		});
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> STATES.clear());
 		registered = true;
 	}
 
