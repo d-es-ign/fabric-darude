@@ -1,0 +1,65 @@
+package com.darude.renewal;
+
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public final class SandstormWindService {
+	private static final int WIND_SHIFT_TICKS = 20 * 6;
+	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
+	private static final Map<String, WindState> STATES = new HashMap<>();
+	private static boolean registered;
+
+	private SandstormWindService() {
+	}
+
+	public static synchronized void register() {
+		if (registered) {
+			return;
+		}
+
+		ServerTickEvents.END_WORLD_TICK.register(SandstormWindService::tickWorld);
+		registered = true;
+	}
+
+	public static Direction getWindDirection(ServerLevel world) {
+		WindState state = STATES.computeIfAbsent(worldKey(world), ignored -> new WindState(Direction.NORTH, world.getGameTime()));
+		return state.direction;
+	}
+
+	private static void tickWorld(ServerLevel world) {
+		long time = world.getGameTime();
+		String key = worldKey(world);
+		WindState state = STATES.computeIfAbsent(key, ignored -> new WindState(Direction.NORTH, time));
+		if (time < state.nextShiftTick) {
+			return;
+		}
+
+		RandomSource random = world.getRandom();
+		Direction next = state.direction;
+		while (next == state.direction) {
+			next = CARDINAL_DIRECTIONS[random.nextInt(CARDINAL_DIRECTIONS.length)];
+		}
+
+		state.direction = next;
+		state.nextShiftTick = time + WIND_SHIFT_TICKS;
+	}
+
+	private static String worldKey(ServerLevel world) {
+		return world.dimension().location().toString();
+	}
+
+	private static final class WindState {
+		private Direction direction;
+		private long nextShiftTick;
+
+		private WindState(Direction direction, long now) {
+			this.direction = direction;
+			this.nextShiftTick = now + WIND_SHIFT_TICKS;
+		}
+	}
+}

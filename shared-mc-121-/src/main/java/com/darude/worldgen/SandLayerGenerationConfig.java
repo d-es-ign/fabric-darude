@@ -69,6 +69,39 @@ public final class SandLayerGenerationConfig {
 					int nearDesertColumnSampleDenominator = root.has("near_desert_column_sample_denominator")
 						? root.get("near_desert_column_sample_denominator").getAsInt()
 						: defaults.nearDesertColumnSampleDenominator();
+					int farmingTickIntervalTicks = root.has("farming_tick_interval_ticks")
+						? root.get("farming_tick_interval_ticks").getAsInt()
+						: defaults.farmingTickIntervalTicks();
+					float baseUnderGrateChance = root.has("base_under_grate_chance")
+						? root.get("base_under_grate_chance").getAsFloat()
+						: defaults.baseUnderGrateChance();
+					float basePyramidSideChance = root.has("base_pyramid_side_chance")
+						? root.get("base_pyramid_side_chance").getAsFloat()
+						: defaults.basePyramidSideChance();
+					float fullPyramidSideChance = root.has("full_pyramid_side_chance")
+						? root.get("full_pyramid_side_chance").getAsFloat()
+						: defaults.fullPyramidSideChance();
+					float windwardSideMultiplier = root.has("windward_side_multiplier")
+						? root.get("windward_side_multiplier").getAsFloat()
+						: defaults.windwardSideMultiplier();
+					float fullPyramidErodeToPyramidChance = root.has("full_pyramid_erode_to_pyramid_chance")
+						? root.get("full_pyramid_erode_to_pyramid_chance").getAsFloat()
+						: defaults.fullPyramidErodeToPyramidChance();
+					float pyramidBreakChance = root.has("pyramid_break_chance")
+						? root.get("pyramid_break_chance").getAsFloat()
+						: defaults.pyramidBreakChance();
+					int maxFallthroughDepth = root.has("max_fallthrough_depth")
+						? root.get("max_fallthrough_depth").getAsInt()
+						: defaults.maxFallthroughDepth();
+					int maxFarmingOperationsPerTick = root.has("max_farming_operations_per_tick")
+						? root.get("max_farming_operations_per_tick").getAsInt()
+						: defaults.maxFarmingOperationsPerTick();
+					int avalancheSlopeThreshold = root.has("avalanche_slope_threshold")
+						? root.get("avalanche_slope_threshold").getAsInt()
+						: defaults.avalancheSlopeThreshold();
+					int avalancheMaxTopplesPerIncrement = root.has("avalanche_max_topples_per_increment")
+						? root.get("avalanche_max_topples_per_increment").getAsInt()
+						: defaults.avalancheMaxTopplesPerIncrement();
 					String nearDesertSpawnableSupportMode = root.has("near_desert_spawnable_support_mode")
 						? root.get("near_desert_spawnable_support_mode").getAsString()
 						: defaults.nearDesertSpawnableSupportMode();
@@ -81,6 +114,17 @@ public final class SandLayerGenerationConfig {
 					nearDesertMaxLayers = clamp(nearDesertMaxLayers, 0, 15);
 					nearDesertColumnSampleDenominator = clamp(nearDesertColumnSampleDenominator, 1, 32);
 					nearDesertColumnSampleNumerator = clamp(nearDesertColumnSampleNumerator, 0, nearDesertColumnSampleDenominator);
+					farmingTickIntervalTicks = clamp(farmingTickIntervalTicks, 1, 1200);
+					baseUnderGrateChance = clamp(baseUnderGrateChance, 0.0f, 1.0f);
+					basePyramidSideChance = clamp(basePyramidSideChance, 0.0f, 1.0f);
+					fullPyramidSideChance = clamp(fullPyramidSideChance, 0.0f, 1.0f);
+					windwardSideMultiplier = clamp(windwardSideMultiplier, 0.0f, 8.0f);
+					fullPyramidErodeToPyramidChance = clamp(fullPyramidErodeToPyramidChance, 0.0f, 1.0f);
+					pyramidBreakChance = clamp(pyramidBreakChance, 0.0f, 1.0f);
+					maxFallthroughDepth = clamp(maxFallthroughDepth, 0, 128);
+					maxFarmingOperationsPerTick = clamp(maxFarmingOperationsPerTick, 0, 4096);
+					avalancheSlopeThreshold = clamp(avalancheSlopeThreshold, 1, 15);
+					avalancheMaxTopplesPerIncrement = clamp(avalancheMaxTopplesPerIncrement, 0, 2048);
 					if (nearDesertMinLayers > nearDesertMaxLayers) {
 						int swap = nearDesertMinLayers;
 						nearDesertMinLayers = nearDesertMaxLayers;
@@ -97,6 +141,17 @@ public final class SandLayerGenerationConfig {
 						nearDesertValidSpotChance,
 						nearDesertMinLayers,
 						nearDesertMaxLayers,
+						farmingTickIntervalTicks,
+						baseUnderGrateChance,
+						basePyramidSideChance,
+						fullPyramidSideChance,
+						windwardSideMultiplier,
+						fullPyramidErodeToPyramidChance,
+						pyramidBreakChance,
+						maxFallthroughDepth,
+						maxFarmingOperationsPerTick,
+						avalancheSlopeThreshold,
+						avalancheMaxTopplesPerIncrement,
 						nearDesertColumnSampleNumerator,
 						nearDesertColumnSampleDenominator,
 						nearDesertSpawnableSupportMode
@@ -124,12 +179,23 @@ public final class SandLayerGenerationConfig {
 		float nearDesertValidSpotChance,
 		int nearDesertMinLayers,
 		int nearDesertMaxLayers,
+		int farmingTickIntervalTicks,
+		float baseUnderGrateChance,
+		float basePyramidSideChance,
+		float fullPyramidSideChance,
+		float windwardSideMultiplier,
+		float fullPyramidErodeToPyramidChance,
+		float pyramidBreakChance,
+		int maxFallthroughDepth,
+		int maxFarmingOperationsPerTick,
+		int avalancheSlopeThreshold,
+		int avalancheMaxTopplesPerIncrement,
 		int nearDesertColumnSampleNumerator,
 		int nearDesertColumnSampleDenominator,
 		String nearDesertSpawnableSupportMode
 	) {
 		public static Values defaults() {
-			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 6, 8, "full_block");
+			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 20, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 512, 3, 64, 6, 8, "full_block");
 		}
 	}
 }
