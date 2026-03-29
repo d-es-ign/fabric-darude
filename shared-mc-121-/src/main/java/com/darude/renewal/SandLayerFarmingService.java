@@ -33,6 +33,7 @@ import java.util.Set;
  */
 public final class SandLayerFarmingService {
 	private static final int PLAYER_CHUNK_SCAN_RADIUS = 8;
+	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 2048;
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> FARMING_EMITTERS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
@@ -69,6 +70,8 @@ public final class SandLayerFarmingService {
 		Set<Long> scannedChunks = collectCandidateChunks(world);
 		Map<Long, Boolean> biomeCache = new HashMap<>();
 		int[] operationsUsed = new int[]{0};
+		int[] verticalChecksUsed = new int[]{0};
+		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, config.maxFarmingOperationsPerTick() * 32);
 
 		for (long packedChunkPos : scannedChunks) {
 			if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
@@ -82,7 +85,7 @@ public final class SandLayerFarmingService {
 				continue;
 			}
 
-			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, operationsUsed);
+			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks);
 		}
 	}
 
@@ -106,7 +109,9 @@ public final class SandLayerFarmingService {
 		Direction windDirection,
 		Random random,
 		Map<Long, Boolean> biomeCache,
-		int[] operationsUsed
+		int[] operationsUsed,
+		int[] verticalChecksUsed,
+		int maxVerticalChecks
 	) {
 		ChunkPos chunkPos = chunk.getPos();
 		for (int localX = 0; localX < 16; localX++) {
@@ -129,6 +134,10 @@ public final class SandLayerFarmingService {
 				}
 
 				for (int y = minY; y <= maxY; y++) {
+					if (verticalChecksUsed[0]++ >= maxVerticalChecks) {
+						return;
+					}
+
 					if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
 						return;
 					}
@@ -176,7 +185,7 @@ public final class SandLayerFarmingService {
 			if (random.nextFloat() >= config.baseUnderGrateChance()) {
 				return false;
 			}
-			return attemptPlacementWithFallthrough(world, emitterPos.down(), config, windDirection, random, biomeCache, operationsUsed, depth + 1);
+			return attemptPlacementWithFallthrough(world, emitterPos.down(), config, windDirection, random, biomeCache, operationsUsed, depth);
 		}
 
 		boolean generated = false;
@@ -197,7 +206,7 @@ public final class SandLayerFarmingService {
 			}
 
 			BlockPos sideTarget = supportPos.offset(direction);
-			if (attemptPlacementWithFallthrough(world, sideTarget, config, windDirection, random, biomeCache, operationsUsed, depth + 1)) {
+			if (attemptPlacementWithFallthrough(world, sideTarget, config, windDirection, random, biomeCache, operationsUsed, depth)) {
 				generated = true;
 			}
 		}
