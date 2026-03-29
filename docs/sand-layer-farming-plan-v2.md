@@ -36,7 +36,8 @@ For all rules below where a sand layer is created/placed:
 ## Core Loop (Farming Version)
 
 1. **Exposed Grate Intake**
-   - A `minecraft:copper_grate` that is outdoors, in a sandstorm, and surrounded by air on all sides can attempt generation.
+   - A configured emitter block (default: all copper grate variants, including waxed/oxidized) that is outdoors, in a sandstorm, and surrounded by air on all sides can attempt generation.
+   - Farming is only valid in sandstorm-origin biomes (`darude:sandstorm_biomes`, e.g. desert).
    - Base behavior: low chance to create exactly one `darude:sand_layer` directly beneath the grate.
 
 2. **Pyramid-Boosted Distribution**
@@ -66,6 +67,7 @@ For all rules below where a sand layer is created/placed:
 ### Exposed Grate Qualification
 
 - Grate must be outside (sky/weather exposed by existing storm checks).
+- Grate must be in a `darude:sandstorm_biomes` biome.
 - Grate must be surrounded by air horizontally and above.
 - For base mode, block below can be any valid support context for placing below-target layers.
 - For pyramid mode, block directly below grate must be a pyramid block.
@@ -109,6 +111,7 @@ For all rules below where a sand layer is created/placed:
 
 - No autonomous terrain-wide deposition from this farming system.
 - Generation only occurs from qualified grates during active sandstorm conditions.
+- Generation only occurs in `darude:sandstorm_biomes` (desert-origin rule).
 - Pyramid bonus requires explicit block placement directly under grate.
 - Wind bonus is modest, so orientation helps but does not dominate structure quality.
 - Avalanche is redistribution-only and generation-triggered only.
@@ -166,6 +169,7 @@ For all rules below where a sand layer is created/placed:
 - `pyramid_break_chance`
 - `max_fallthrough_depth`
 - `max_farming_operations_per_tick`
+- `farming_emitters` (block tag)
 - `slope_threshold`
 - `max_topples_per_tick`
 - `avalanche_neighbor_scan_radius`
