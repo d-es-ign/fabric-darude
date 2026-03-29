@@ -18,5 +18,5 @@
   "max_fallthrough_depth": 12,
   "max_farming_operations_per_tick": 512,
   "avalanche_slope_threshold": 3,
-  "avalanche_max_topples_per_increment": 64
+  "max_topples_per_tick": 256
 }

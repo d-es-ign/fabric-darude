@@ -99,9 +99,11 @@ public final class SandLayerGenerationConfig {
 					int avalancheSlopeThreshold = root.has("avalanche_slope_threshold")
 						? root.get("avalanche_slope_threshold").getAsInt()
 						: defaults.avalancheSlopeThreshold();
-					int avalancheMaxTopplesPerIncrement = root.has("avalanche_max_topples_per_increment")
-						? root.get("avalanche_max_topples_per_increment").getAsInt()
-						: defaults.avalancheMaxTopplesPerIncrement();
+					int maxTopplesPerTick = root.has("max_topples_per_tick")
+						? root.get("max_topples_per_tick").getAsInt()
+						: (root.has("avalanche_max_topples_per_increment")
+							? root.get("avalanche_max_topples_per_increment").getAsInt()
+							: defaults.maxTopplesPerTick());
 					String nearDesertSpawnableSupportMode = root.has("near_desert_spawnable_support_mode")
 						? root.get("near_desert_spawnable_support_mode").getAsString()
 						: defaults.nearDesertSpawnableSupportMode();
@@ -124,7 +126,7 @@ public final class SandLayerGenerationConfig {
 					maxFallthroughDepth = clamp(maxFallthroughDepth, 0, 128);
 					maxFarmingOperationsPerTick = clamp(maxFarmingOperationsPerTick, 0, 4096);
 					avalancheSlopeThreshold = clamp(avalancheSlopeThreshold, 1, 15);
-					avalancheMaxTopplesPerIncrement = clamp(avalancheMaxTopplesPerIncrement, 0, 2048);
+					maxTopplesPerTick = clamp(maxTopplesPerTick, 0, 16384);
 					if (nearDesertMinLayers > nearDesertMaxLayers) {
 						int swap = nearDesertMinLayers;
 						nearDesertMinLayers = nearDesertMaxLayers;
@@ -151,7 +153,7 @@ public final class SandLayerGenerationConfig {
 						maxFallthroughDepth,
 						maxFarmingOperationsPerTick,
 						avalancheSlopeThreshold,
-						avalancheMaxTopplesPerIncrement,
+						maxTopplesPerTick,
 						nearDesertColumnSampleNumerator,
 						nearDesertColumnSampleDenominator,
 						nearDesertSpawnableSupportMode
@@ -189,13 +191,13 @@ public final class SandLayerGenerationConfig {
 		int maxFallthroughDepth,
 		int maxFarmingOperationsPerTick,
 		int avalancheSlopeThreshold,
-		int avalancheMaxTopplesPerIncrement,
+		int maxTopplesPerTick,
 		int nearDesertColumnSampleNumerator,
 		int nearDesertColumnSampleDenominator,
 		String nearDesertSpawnableSupportMode
 	) {
 		public static Values defaults() {
-			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 20, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 512, 3, 64, 6, 8, "full_block");
+			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 20, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 512, 3, 256, 6, 8, "full_block");
 		}
 	}
 }

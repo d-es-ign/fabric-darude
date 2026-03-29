@@ -23,7 +23,8 @@ import java.util.Set;
  * Kept separate from chunk/world generation logic.
  */
 public final class SandLayerAvalancheService {
-	private static final int MAX_QUEUED_CELLS_PER_TICK = 64;
+	private static final int MAX_QUEUED_CELLS_PER_TICK = 128;
+	private static final int CHUNK_WINDOW_RADIUS = 1;
 	private static final Map<String, ArrayDeque<BlockPos>> QUEUES = new HashMap<>();
 	private static final Map<String, Set<Long>> QUEUED_KEYS = new HashMap<>();
 	private static boolean registered;
@@ -55,7 +56,8 @@ public final class SandLayerAvalancheService {
 
 	private static void onEndWorldTick(ServerWorld world) {
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
-		if (config.avalancheMaxTopplesPerIncrement() <= 0) {
+		int remainingBudget = config.maxTopplesPerTick();
+		if (remainingBudget <= 0) {
 			return;
 		}
 
@@ -66,51 +68,71 @@ public final class SandLayerAvalancheService {
 		}
 
 		Set<Long> queued = QUEUED_KEYS.get(key);
-		int processed = 0;
-		while (processed < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty()) {
+		int processedCenters = 0;
+		while (remainingBudget > 0 && processedCenters < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty()) {
 			BlockPos center = queue.poll();
 			if (queued != null) {
 				queued.remove(center.asLong());
 			}
 
-			WorldChunk chunk = world.getChunk(center.getX() >> 4, center.getZ() >> 4, ChunkStatus.FULL, false);
-			if (chunk == null) {
-				processed++;
+			WindowGrid grid = WindowGrid.create(world, center, CHUNK_WINDOW_RADIUS);
+			if (grid == null) {
+				processedCenters++;
 				continue;
 			}
 
 			AvalancheRedistributor redistributor = new AvalancheRedistributor(config.avalancheSlopeThreshold());
-			ChunkPlaneGrid grid = new ChunkPlaneGrid(world, chunk, center.getY());
-			redistributor.redistributeBudget(grid, config.avalancheMaxTopplesPerIncrement());
-			processed++;
+			int processedTopples = redistributor.redistributeBudget(grid, remainingBudget);
+			remainingBudget -= processedTopples;
+			processedCenters++;
 		}
 	}
 
-	private static final class ChunkPlaneGrid implements AvalancheRedistributor.Grid {
+	private static final class WindowGrid implements AvalancheRedistributor.Grid {
 		private final ServerWorld world;
-		private final WorldChunk chunk;
 		private final int minX;
 		private final int minZ;
 		private final int y;
-		private final int[] heights = new int[16 * 16];
+		private final int width;
+		private final int height;
+		private final int[] heights;
 
-		private ChunkPlaneGrid(ServerWorld world, WorldChunk chunk, int y) {
+		private WindowGrid(ServerWorld world, int minX, int minZ, int y, int width, int height) {
 			this.world = world;
-			this.chunk = chunk;
-			this.minX = chunk.getPos().getStartX();
-			this.minZ = chunk.getPos().getStartZ();
+			this.minX = minX;
+			this.minZ = minZ;
 			this.y = y;
-			loadHeights();
+			this.width = width;
+			this.height = height;
+			this.heights = new int[width * height];
+		}
+
+		static WindowGrid create(ServerWorld world, BlockPos center, int chunkWindowRadius) {
+			int centerChunkX = center.getX() >> 4;
+			int centerChunkZ = center.getZ() >> 4;
+			WorldChunk centerChunk = world.getChunk(centerChunkX, centerChunkZ, ChunkStatus.FULL, false);
+			if (centerChunk == null) {
+				return null;
+			}
+
+			int chunksAcross = chunkWindowRadius * 2 + 1;
+			int width = chunksAcross * 16;
+			int height = chunksAcross * 16;
+			int minX = (centerChunkX - chunkWindowRadius) << 4;
+			int minZ = (centerChunkZ - chunkWindowRadius) << 4;
+			WindowGrid grid = new WindowGrid(world, minX, minZ, center.getY(), width, height);
+			grid.loadHeights();
+			return grid;
 		}
 
 		@Override
 		public int width() {
-			return 16;
+			return width;
 		}
 
 		@Override
 		public int height() {
-			return 16;
+			return height;
 		}
 
 		@Override
@@ -120,7 +142,15 @@ public final class SandLayerAvalancheService {
 
 		@Override
 		public void setHeight(int x, int z, int newHeight) {
-			applyHeight(x, z, newHeight);
+			if (!inBounds(x, z)) {
+				return;
+			}
+
+			int idx = indexOf(x, z);
+			heights[idx] = Math.max(0, newHeight);
+			BlockPos pos = worldPos(x, z, y);
+			setColumnHeightAt(pos, heights[idx]);
+			heights[idx] = sandHeightFor(world.getBlockState(pos));
 		}
 
 		@Override
@@ -130,61 +160,145 @@ public final class SandLayerAvalancheService {
 				return;
 			}
 
-			BlockPos pos = worldPos(neighborX, neighborZ);
-			BlockState state = chunk.getBlockState(pos);
-			if (isSandMass(state)) {
+			BlockPos neighborPos = worldPos(neighborX, neighborZ, y);
+			BlockState neighborState = world.getBlockState(neighborPos);
+			if (isSandMass(neighborState)) {
 				out.set(AvalancheRedistributor.NeighborState.VALID, heights[indexOf(neighborX, neighborZ)], neighborX, neighborZ);
 				return;
 			}
 
-			if (state.isAir()) {
-				boolean canPlace = DarudeBlocks.SAND_LAYER.getDefaultState().canPlaceAt(world, pos);
-				out.set(canPlace ? AvalancheRedistributor.NeighborState.VALID : AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, neighborX, neighborZ);
+			if (!neighborState.isAir()) {
+				out.set(AvalancheRedistributor.NeighborState.BLOCKED, 0, neighborX, neighborZ);
 				return;
 			}
 
-			out.set(AvalancheRedistributor.NeighborState.BLOCKED, 0, neighborX, neighborZ);
+			BlockPos belowPos = neighborPos.down();
+			BlockState belowState = world.getBlockState(belowPos);
+			boolean settleBelow = belowState.isAir() || belowState.isOf(DarudeBlocks.SAND_LAYER);
+			if (settleBelow) {
+				if (canAcceptSandLayerAt(belowPos)) {
+					out.set(AvalancheRedistributor.NeighborState.VALID, 0, neighborX + width, neighborZ);
+				} else {
+					out.set(AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, neighborX + width, neighborZ);
+				}
+				return;
+			}
+
+			if (canAcceptSandLayerAt(neighborPos)) {
+				out.set(AvalancheRedistributor.NeighborState.VALID, 0, neighborX, neighborZ);
+			} else {
+				out.set(AvalancheRedistributor.NeighborState.UNPLACEABLE, 0, neighborX, neighborZ);
+			}
 		}
 
 		@Override
 		public void addTransferredLayers(int x, int z, int layers) {
-			if (!inBounds(x, z) || layers <= 0) {
+			if (layers <= 0) {
 				return;
 			}
 
-			int current = heights[indexOf(x, z)];
-			applyHeight(x, z, Math.min(16, current + layers));
+			boolean verticalTarget = x >= width && x < width * 2;
+			int localX = verticalTarget ? x - width : x;
+			if (!inBounds(localX, z)) {
+				return;
+			}
+
+			BlockPos targetPos = worldPos(localX, z, verticalTarget ? y - 1 : y);
+			addLayersConservatively(targetPos, layers);
+
+			if (!verticalTarget) {
+				heights[indexOf(localX, z)] = sandHeightFor(world.getBlockState(worldPos(localX, z, y)));
+			}
 		}
 
 		private void loadHeights() {
-			for (int z = 0; z < 16; z++) {
-				for (int x = 0; x < 16; x++) {
-					BlockState state = chunk.getBlockState(worldPos(x, z));
-					heights[indexOf(x, z)] = sandHeightFor(state);
+			for (int z = 0; z < height; z++) {
+				for (int x = 0; x < width; x++) {
+					heights[indexOf(x, z)] = sandHeightFor(world.getBlockState(worldPos(x, z, y)));
 				}
 			}
 		}
 
-		private void applyHeight(int x, int z, int newHeight) {
-			int idx = indexOf(x, z);
-			int clamped = Math.max(0, newHeight);
-			heights[idx] = clamped;
-
-			BlockPos pos = worldPos(x, z);
-			BlockState newState;
-			if (clamped <= 0) {
-				newState = Blocks.AIR.getDefaultState();
-			} else if (clamped >= 16) {
-				newState = Blocks.SAND.getDefaultState();
-			} else {
-				newState = DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clamped);
+		private boolean canAcceptSandLayerAt(BlockPos pos) {
+			BlockState state = world.getBlockState(pos);
+			if (state.isOf(DarudeBlocks.SAND_LAYER)) {
+				return true;
 			}
 
-			world.setBlockState(pos, newState, 3);
+			if (!state.isAir()) {
+				return false;
+			}
+
+			return DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, 1).canPlaceAt(world, pos);
 		}
 
-		private BlockPos worldPos(int x, int z) {
-			return new BlockPos(minX + x, y, minZ + z);
+		private void setColumnHeightAt(BlockPos pos, int desiredHeight) {
+			int remaining = Math.max(0, desiredHeight);
+			BlockPos.Mutable cursor = pos.mutableCopy();
+
+			while (remaining > 0) {
+				if (remaining >= 16) {
+					world.setBlockState(cursor, Blocks.SAND.getDefaultState(), 3);
+					remaining -= 16;
+					cursor.move(0, 1, 0);
+					continue;
+				}
+
+				world.setBlockState(cursor, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, remaining), 3);
+				remaining = 0;
+			}
+
+			if (desiredHeight == 0) {
+				world.setBlockState(pos, Blocks.AIR.getDefaultState(), 3);
+			}
+		}
+
+		private void addLayersConservatively(BlockPos startPos, int layers) {
+			BlockPos.Mutable cursor = startPos.mutableCopy();
+			int remaining = layers;
+
+			while (remaining > 0) {
+				BlockState state = world.getBlockState(cursor);
+				if (state.isOf(Blocks.SAND)) {
+					cursor.move(0, 1, 0);
+					continue;
+				}
+
+				if (state.isOf(DarudeBlocks.SAND_LAYER)) {
+					int current = state.get(SandLayerBlock.LAYERS);
+					int total = current + remaining;
+					if (total <= 15) {
+						world.setBlockState(cursor, state.with(SandLayerBlock.LAYERS, total), 3);
+						return;
+					}
+
+					world.setBlockState(cursor, Blocks.SAND.getDefaultState(), 3);
+					remaining = total - 16;
+					cursor.move(0, 1, 0);
+					continue;
+				}
+
+				if (!state.isAir()) {
+					return;
+				}
+
+				if (!DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, 1).canPlaceAt(world, cursor)) {
+					return;
+				}
+
+				if (remaining >= 16) {
+					world.setBlockState(cursor, Blocks.SAND.getDefaultState(), 3);
+					remaining -= 16;
+					cursor.move(0, 1, 0);
+				} else {
+					world.setBlockState(cursor, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, remaining), 3);
+					return;
+				}
+			}
+		}
+
+		private BlockPos worldPos(int x, int z, int yLevel) {
+			return new BlockPos(minX + x, yLevel, minZ + z);
 		}
 
 		private static int sandHeightFor(BlockState state) {
@@ -199,12 +313,12 @@ public final class SandLayerAvalancheService {
 			return state.isOf(DarudeBlocks.SAND_LAYER) || state.isOf(Blocks.SAND);
 		}
 
-		private static boolean inBounds(int x, int z) {
-			return x >= 0 && z >= 0 && x < 16 && z < 16;
+		private boolean inBounds(int x, int z) {
+			return x >= 0 && z >= 0 && x < width && z < height;
 		}
 
-		private static int indexOf(int x, int z) {
-			return z * 16 + x;
+		private int indexOf(int x, int z) {
+			return z * width + x;
 		}
 	}
 }
