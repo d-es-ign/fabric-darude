@@ -1,113 +1,89 @@
-# Sand Layer Farming Plan V1 (Grate + Pyramid Wind Capture)
+# Sand Layer Farming Plan V1 (Implemented Behavior)
+
+This document reflects the current V1 farming runtime as implemented.
 
 ## Goal
 
-Define an intentional, farmable sand-layer generation system centered on exposed copper grates and pyramid-assisted wind capture.
+Provide intentional, build-driven `darude:sand_layer` farming during sandstorms.
 
-## Design Principle
+## Core Constraints
 
-- Natural storms provide the input signal.
-- Players create output by building specific structures in valid, exposed locations.
-- Yield scales by design quality (layout, chaining, wind orientation), not passive world drift.
+- Farming generation is allowed only during rain/sandstorm conditions.
+- Farming generation is allowed only in sandstorm-origin biomes (`darude:sandstorm_biomes`, e.g. desert).
+- Emitter blocks are data-driven via block tag `darude:farming_emitters`.
+- Default emitter set includes all copper grate variants (normal/exposed/weathered/oxidized + waxed variants).
 
-## Placement Validity Rule (Applies Everywhere)
+## Runtime Scan Model (Current)
 
-For all rules below where a sand layer is created/placed:
+- Uses loaded-chunk approximation around players (chunk radius per player).
+- For each scanned X/Z column, emitter checks run vertically from:
+  - `max(world bottom, sea level)` up to
+  - column top (`WORLD_SURFACE - 1`).
+- Biome gating is evaluated per column (cached), sampled at surface-oriented Y.
 
-- The target must be a valid placement location.
-- Valid means the block is air or `darude:sand_layer`.
-- The block below must allow `darude:sand_layer` to exist.
-- If target already contains `darude:sand_layer`, increment layer count by one instead of replacing.
+## Emitter Qualification (Current)
 
-## Pyramid Erosion Rule (New)
+An emitter attempt is valid only when all are true:
 
-- Erosion rolls only happen when pyramid-backed generation successfully creates/increments a `darude:sand_layer`.
-- If support block is `darude:full_pyramid`, roll a small chance to downgrade it to `darude:pyramid`.
-- If support block is `darude:pyramid`, roll a small chance to destroy it (replace with air).
-- This makes high-output farms require periodic maintenance.
+1. World is raining.
+2. Emitter column is in `darude:sandstorm_biomes`.
+3. Sky is visible above the emitter.
+4. Horizontal neighbors (N/E/S/W) and above are air.
+5. Block below emitter is one of:
+   - `air`
+   - `darude:sand_layer`
+   - `darude:pyramid`
+   - `darude:full_pyramid`
 
-## Core Loop (Farming Version)
+## Generation Modes (Current)
 
-1. **Exposed Grate Intake**
-   - A `minecraft:copper_grate` that is outdoors, in a sandstorm, and surrounded by air on all sides, can attempt generation.
-   - Base behavior: low chance to create exactly one `darude:sand_layer` directly beneath the grate.
+### A) Base Under-Grate Mode
 
-2. **Pyramid-Boosted Distribution**
-   - If a pyramid block is directly below that grate, generation target changes.
-   - The grate attempts to place one `darude:sand_layer` on each horizontal side adjacent to the pyramid (N/E/S/W).
-   - The side wind is blowing against (windward side) gets a slightly increased placement chance.
-
-3. **Vertical Fall-Through Chaining**
-   - If a selected generation target is another valid grate cell, sand does not place there.
-   - Instead, treat that as a fall-through event and run generation logic for the lower grate instance.
-   - This enables stacked grate chains to pass sand downward until a non-grate valid target is found (or generation fails).
-
-## Structure Rules
-
-### Exposed Grate Qualification
-
-- Grate must be outside (sky/weather exposed by existing storm checks).
-- Grate must be surrounded by air horizontally and above.
-- For base mode, block below can be any valid support context for placing below-target layers.
-- For pyramid mode, block directly below grate must be a pyramid block.
-
-### Pyramid Mode
-
-- A grate with `darude:pyramid` or `darude:full_pyramid` directly below enters side-placement mode.
-- Candidate cells are the four cells adjacent to the pyramid at the same Y as the pyramid top target layer.
-- Each candidate is rolled independently.
-- Windward candidate receives a configurable multiplier.
-- `darude:full_pyramid` uses a slightly higher base side-generation chance than `darude:pyramid`.
-
-### Fall-Through Rule
-
-- If candidate target block is `minecraft:copper_grate`, do not place a layer there.
-- If that target grate is also qualified (outdoor + air-surrounded, and either no special block below or pyramid below), recursively/iteratively evaluate it as the next emitter.
-- Stop when:
-  - a non-grate valid target is placed,
-  - qualification fails,
-  - max fall-through depth is reached (safety cap).
-
-## Hard Anti-Passive Rules (Recommended)
-
-- No autonomous terrain-wide deposition from this farming system.
-- Generation only occurs from qualified grates during active sandstorm conditions.
-- Pyramid bonus requires explicit block placement directly under grate.
-- Wind bonus is modest, so orientation helps but does not dominate structure quality.
-
-## Proposed V1 Rules (Draft)
-
-### Runtime Rule Set (Concrete V1)
-
-- Tick each qualified grate at configured interval.
-- If no pyramid below:
+- If no pyramid directly below emitter:
   - Roll `base_under_grate_chance`.
-  - On success, attempt one placement directly below.
-- If pyramid below:
-  - For each side in N/E/S/W:
-    - Roll `base_pyramid_side_chance` when support is `darude:pyramid`.
-    - Roll `full_pyramid_side_chance` when support is `darude:full_pyramid`.
-    - If side is windward, multiply by `windward_side_multiplier`.
-    - On success, attempt one placement on that side target.
-- Every placement attempt uses validity checks and fall-through handling.
-- After each successful pyramid-backed generation:
-  - If support is `darude:full_pyramid`, roll `full_pyramid_erode_to_pyramid_chance`.
-  - If support is `darude:pyramid`, roll `pyramid_break_chance`.
+  - On success, attempt one placement at `emitterPos.down()`.
 
-### Wind Handling
+### B) Pyramid Side Mode
 
-- Windward side is derived from active storm wind vector.
-- If wind is diagonal, pick the dominant cardinal component.
-- If no reliable wind direction is available, skip windward bonus and use base chances.
+- If block directly below emitter is pyramid/full_pyramid:
+  - For each cardinal side around the support block, roll:
+    - `base_pyramid_side_chance` for `darude:pyramid`
+    - `full_pyramid_side_chance` for `darude:full_pyramid`
+  - Windward side uses `chance * windward_side_multiplier`.
+  - Side targets are at the support block Y-level (same level as pyramid block).
 
-### Safety / Performance
+## Wind Handling (Current)
 
-- Use iterative fall-through (not deep recursion).
-- Cap per-source fall-through depth.
-- Cap total farming operations per tick globally.
-- Process only loaded chunks and active storms.
+- Server-side wind direction is cardinal and world-local.
+- Direction shifts at fixed cadence (`WIND_SHIFT_TICKS`).
+- Windward side is the opposite of wind direction (the side facing incoming wind).
 
-## Tuning Knobs
+## Fall-Through (Current)
+
+- If a target cell is another emitter (`darude:farming_emitters`), do not place there.
+- Evaluate that emitter as the next source (re-qualification required).
+- Iterative depth cap enforced by `max_fallthrough_depth`.
+
+## Placement / Increment Rules (Current)
+
+- If target is `air` and layer can survive: place `darude:sand_layer` with 1 layer.
+- If target is existing `darude:sand_layer`: increment layers.
+- Layer overflow converts to `minecraft:sand` at threshold.
+
+## Pyramid Erosion (Current)
+
+After successful pyramid-backed generation:
+
+- `darude:full_pyramid` may downgrade to `darude:pyramid` via `full_pyramid_erode_to_pyramid_chance`.
+- `darude:pyramid` may break to `air` via `pyramid_break_chance`.
+
+## Budgets / Safety (Current)
+
+- Global farming operation cap per tick: `max_farming_operations_per_tick`.
+- Farming evaluation interval: `farming_tick_interval_ticks`.
+- Fall-through depth cap: `max_fallthrough_depth`.
+
+## Config Knobs (V1)
 
 - `farming_tick_interval_ticks`
 - `base_under_grate_chance`
@@ -118,8 +94,9 @@ For all rules below where a sand layer is created/placed:
 - `pyramid_break_chance`
 - `max_fallthrough_depth`
 - `max_farming_operations_per_tick`
+- `farming_emitters` (block tag)
 
-## Initial Defaults (Recommended)
+## Current Defaults
 
 - `farming_tick_interval_ticks = 20`
 - `base_under_grate_chance = 0.03`
@@ -131,73 +108,7 @@ For all rules below where a sand layer is created/placed:
 - `max_fallthrough_depth = 12`
 - `max_farming_operations_per_tick = 512`
 
-## Validation Checklist (V1)
+## Note on V2
 
-- Single exposed grate in storm occasionally creates one layer directly below.
-- Same grate with pyramid below creates side layers around pyramid, with measurable windward bias.
-- Same setup using `darude:full_pyramid` produces slightly higher side-generation than `darude:pyramid`.
-- Targeting another qualifying grate triggers fall-through instead of direct placement on grate block.
-- Chained grates stop safely at depth cap and never loop infinitely.
-- Invalid targets (blocked, unsupported) correctly reject placement.
-- Repeated successful generation erodes supports (`full_pyramid -> pyramid -> air`) at configured low rates.
-- Tick cost stays within configured operation budget under dense farm setups.
-
-## Implementation Checklist (Code Touchpoints)
-
-Phase 1: Config and schema
-
-- [ ] Add farming config fields to `src/main/resources/data/darude/worldgen/sand_layer_generation.json`:
-  - `farming_tick_interval_ticks`
-  - `base_under_grate_chance`
-  - `base_pyramid_side_chance`
-  - `full_pyramid_side_chance`
-  - `windward_side_multiplier`
-  - `full_pyramid_erode_to_pyramid_chance`
-  - `pyramid_break_chance`
-  - `max_fallthrough_depth`
-  - `max_farming_operations_per_tick`
-- [ ] Parse and clamp fields in `src/main/java/com/darude/worldgen/SandLayerGenerationConfig.java`.
-
-Phase 2: Qualification helpers
-
-- [ ] Add grate qualification helpers in `src/main/java/com/darude/renewal/` (or existing renewal runtime package):
-  - `isQualifiedFarmingGrate(...)`
-  - `isAirSurroundedHorizontally(...)`
-  - `hasPyramidBelow(...)`
-  - `getPyramidSupportTypeBelow(...)`
-  - `isValidSandLayerTarget(...)`
-
-Phase 3: Farming runtime
-
-- [ ] Add/extend server tick handler for grate farming evaluation.
-- [ ] Implement base under-grate mode.
-- [ ] Implement pyramid side mode with windward weighting.
-- [ ] Apply support-specific rates (`pyramid` vs `full_pyramid`) for side generation.
-- [ ] Implement fall-through chain resolution with depth cap.
-- [ ] Apply erosion rolls on successful pyramid-backed generation (`full_pyramid -> pyramid`, `pyramid -> air`).
-- [ ] Register runtime from `src/main/java/com/darude/DarudeMod.java`.
-
-Phase 4: Verification and telemetry
-
-- [ ] Add tests/sim scenarios for base grate, pyramid mode, wind bias, and grate-chain fall-through.
-- [ ] Add erosion progression tests for `full_pyramid -> pyramid -> air`.
-- [ ] Add debug counters:
-  - attempts
-  - successful placements
-  - fall-through traversals
-  - rejected invalid targets
-  - depth-cap terminations
-  - full-pyramid downgrades
-  - pyramid breaks
-
-## Success Criteria
-
-- Players can intentionally farm `darude:sand_layer` using visible structure logic.
-- Pyramid-assisted setups outperform bare grates in a predictable way.
-- `darude:full_pyramid` supports outperform `darude:pyramid` but erode over time, adding maintenance cost.
-- Wind direction provides a small but consistent optimization lever.
-- Vertical grate chains behave deterministically and stay performance-safe.
-
-## Next Step When Resuming
-
-Implement Phase 1-2 first (config + qualification helpers), then ship a test build with Phase 3 runtime and telemetry enabled for tuning.
+V2 adds generation-triggered avalanche redistribution on top of this baseline.
+See `docs/sand-layer-farming-plan-v2.md`.
