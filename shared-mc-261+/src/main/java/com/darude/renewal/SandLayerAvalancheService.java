@@ -25,8 +25,8 @@ import java.util.Set;
 public final class SandLayerAvalancheService {
 	private static final int MAX_QUEUED_CELLS_PER_TICK = 128;
 	private static final int CHUNK_WINDOW_RADIUS = 1;
-	private static final Map<String, ArrayDeque<BlockPos>> QUEUES = new HashMap<>();
-	private static final Map<String, Set<Long>> QUEUED_KEYS = new HashMap<>();
+	private static final Map<ServerLevel, ArrayDeque<BlockPos>> QUEUES = new HashMap<>();
+	private static final Map<ServerLevel, Set<Long>> QUEUED_KEYS = new HashMap<>();
 	private static boolean registered;
 
 	private SandLayerAvalancheService() {
@@ -46,9 +46,8 @@ public final class SandLayerAvalancheService {
 	}
 
 	public static void enqueue(ServerLevel world, BlockPos pos) {
-		String key = world.dimension().getValue().toString();
-		ArrayDeque<BlockPos> queue = QUEUES.computeIfAbsent(key, ignored -> new ArrayDeque<>());
-		Set<Long> queued = QUEUED_KEYS.computeIfAbsent(key, ignored -> new HashSet<>());
+		ArrayDeque<BlockPos> queue = QUEUES.computeIfAbsent(world, ignored -> new ArrayDeque<>());
+		Set<Long> queued = QUEUED_KEYS.computeIfAbsent(world, ignored -> new HashSet<>());
 
 		long packed = pos.asLong();
 		if (!queued.add(packed)) {
@@ -65,13 +64,12 @@ public final class SandLayerAvalancheService {
 			return;
 		}
 
-		String key = world.dimension().getValue().toString();
-		ArrayDeque<BlockPos> queue = QUEUES.get(key);
+		ArrayDeque<BlockPos> queue = QUEUES.get(world);
 		if (queue == null || queue.isEmpty()) {
 			return;
 		}
 
-		Set<Long> queued = QUEUED_KEYS.get(key);
+		Set<Long> queued = QUEUED_KEYS.get(world);
 		int processedCenters = 0;
 		while (remainingBudget > 0 && processedCenters < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty()) {
 			BlockPos center = queue.poll();

@@ -11,7 +11,7 @@ import java.util.Map;
 public final class SandstormWindService {
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
-	private static final Map<String, WindState> STATES = new HashMap<>();
+	private static final Map<ServerLevel, WindState> STATES = new HashMap<>();
 	private static boolean registered;
 
 	private SandstormWindService() {
@@ -31,14 +31,13 @@ public final class SandstormWindService {
 	}
 
 	public static Direction getWindDirection(ServerLevel world) {
-		WindState state = STATES.computeIfAbsent(worldKey(world), ignored -> new WindState(Direction.NORTH, world.getGameTime()));
+		WindState state = STATES.computeIfAbsent(world, ignored -> new WindState(Direction.NORTH, world.getGameTime()));
 		return state.direction;
 	}
 
 	private static void tickWorld(ServerLevel world) {
 		long time = world.getGameTime();
-		String key = worldKey(world);
-		WindState state = STATES.computeIfAbsent(key, ignored -> new WindState(Direction.NORTH, time));
+		WindState state = STATES.computeIfAbsent(world, ignored -> new WindState(Direction.NORTH, time));
 		if (time < state.nextShiftTick) {
 			return;
 		}
@@ -51,10 +50,6 @@ public final class SandstormWindService {
 
 		state.direction = next;
 		state.nextShiftTick = time + WIND_SHIFT_TICKS;
-	}
-
-	private static String worldKey(ServerLevel world) {
-		return world.dimension().getValue().toString();
 	}
 
 	private static final class WindState {
