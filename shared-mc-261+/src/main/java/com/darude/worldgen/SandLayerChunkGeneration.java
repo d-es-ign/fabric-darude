@@ -26,7 +26,7 @@ import java.util.Map;
 
 public final class SandLayerChunkGeneration {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final TagKey<Block> SAND_LAYER_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_support"));
+	private static final TagKey<Block> SAND_LAYER_DESERT_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_desert_support"));
 	private static final TagKey<Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
@@ -86,7 +86,7 @@ public final class SandLayerChunkGeneration {
 
 					BlockPos supportPos = placementPos.below();
 					BlockState supportState = world.getBlockState(supportPos);
-					if (!supportState.is(SAND_LAYER_SUPPORT)) {
+					if (!supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
 						continue;
 					}
 
