@@ -115,9 +115,13 @@ public final class SandLayerAvalancheService {
 		static WindowGrid create(ServerWorld world, BlockPos center, int chunkWindowRadius) {
 			int centerChunkX = center.getX() >> 4;
 			int centerChunkZ = center.getZ() >> 4;
-			var centerChunk = world.getChunk(centerChunkX, centerChunkZ, ChunkStatus.FULL, false);
-			if (!(centerChunk instanceof WorldChunk)) {
-				return null;
+			for (int cz = centerChunkZ - chunkWindowRadius; cz <= centerChunkZ + chunkWindowRadius; cz++) {
+				for (int cx = centerChunkX - chunkWindowRadius; cx <= centerChunkX + chunkWindowRadius; cx++) {
+					var chunk = world.getChunk(cx, cz, ChunkStatus.FULL, false);
+					if (!(chunk instanceof WorldChunk)) {
+						return null;
+					}
+				}
 			}
 
 			int chunksAcross = chunkWindowRadius * 2 + 1;
@@ -155,7 +159,7 @@ public final class SandLayerAvalancheService {
 			heights[idx] = Math.max(0, newHeight);
 			BlockPos pos = worldPos(x, z, y);
 			setColumnHeightAt(pos, heights[idx]);
-			heights[idx] = sandHeightFor(world.getBlockState(pos));
+			heights[idx] = readColumnHeightAt(pos);
 		}
 
 		@Override
@@ -212,14 +216,16 @@ public final class SandLayerAvalancheService {
 			addLayersConservatively(targetPos, layers);
 
 			if (!verticalTarget) {
-				heights[indexOf(localX, z)] = sandHeightFor(world.getBlockState(worldPos(localX, z, y)));
+				heights[indexOf(localX, z)] = readColumnHeightAt(worldPos(localX, z, y));
 			}
 		}
 
 		private void loadHeights() {
+			BlockPos.Mutable cursor = BlockPos.ORIGIN.mutableCopy();
 			for (int z = 0; z < height; z++) {
 				for (int x = 0; x < width; x++) {
-					heights[indexOf(x, z)] = readColumnHeightAt(worldPos(x, z, y));
+					cursor.set(minX + x, y, minZ + z);
+					heights[indexOf(x, z)] = readColumnHeightAt(cursor);
 				}
 			}
 		}
