@@ -46,7 +46,11 @@ public final class SandLayerFarmingService {
 			return;
 		}
 
-		ServerTickEvents.END_WORLD_TICK.register(SandLayerFarmingService::onEndWorldTick);
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (ServerLevel world : server.getAllLevels()) {
+				onEndWorldTick(world);
+			}
+		});
 		registered = true;
 	}
 
@@ -78,12 +82,12 @@ public final class SandLayerFarmingService {
 
 			int chunkX = ChunkPos.getX(packedChunkPos);
 			int chunkZ = ChunkPos.getZ(packedChunkPos);
-			LevelChunk chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-			if (chunk == null) {
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof LevelChunk levelChunk)) {
 				continue;
 			}
 
-			scanChunk(world, chunk, config, windDirection, random, biomeCache, operationsUsed);
+			scanChunk(world, levelChunk, config, windDirection, random, biomeCache, operationsUsed);
 		}
 	}
 
@@ -93,7 +97,7 @@ public final class SandLayerFarmingService {
 			ChunkPos center = player.chunkPosition();
 			for (int dz = -PLAYER_CHUNK_SCAN_RADIUS; dz <= PLAYER_CHUNK_SCAN_RADIUS; dz++) {
 				for (int dx = -PLAYER_CHUNK_SCAN_RADIUS; dx <= PLAYER_CHUNK_SCAN_RADIUS; dx++) {
-					chunks.add(ChunkPos.asLong(center.x + dx, center.z + dz));
+					chunks.add(ChunkPos.pack(center.x() + dx, center.z() + dz));
 				}
 			}
 		}

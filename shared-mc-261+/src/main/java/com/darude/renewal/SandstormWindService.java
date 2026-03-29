@@ -22,7 +22,11 @@ public final class SandstormWindService {
 			return;
 		}
 
-		ServerTickEvents.END_WORLD_TICK.register(SandstormWindService::tickWorld);
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (ServerLevel world : server.getAllLevels()) {
+				tickWorld(world);
+			}
+		});
 		registered = true;
 	}
 
@@ -50,7 +54,7 @@ public final class SandstormWindService {
 	}
 
 	private static String worldKey(ServerLevel world) {
-		return world.dimension().location().toString();
+		return world.dimension().getValue().toString();
 	}
 
 	private static final class WindState {

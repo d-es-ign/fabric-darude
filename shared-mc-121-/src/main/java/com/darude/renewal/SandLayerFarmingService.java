@@ -77,12 +77,12 @@ public final class SandLayerFarmingService {
 
 			int chunkX = ChunkPos.getPackedX(packedChunkPos);
 			int chunkZ = ChunkPos.getPackedZ(packedChunkPos);
-			WorldChunk chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-			if (chunk == null) {
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof WorldChunk worldChunk)) {
 				continue;
 			}
 
-			scanChunk(world, chunk, config, windDirection, random, biomeCache, operationsUsed);
+			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, operationsUsed);
 		}
 	}
 

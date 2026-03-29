@@ -110,8 +110,8 @@ public final class SandLayerAvalancheService {
 		static WindowGrid create(ServerWorld world, BlockPos center, int chunkWindowRadius) {
 			int centerChunkX = center.getX() >> 4;
 			int centerChunkZ = center.getZ() >> 4;
-			WorldChunk centerChunk = world.getChunk(centerChunkX, centerChunkZ, ChunkStatus.FULL, false);
-			if (centerChunk == null) {
+			var centerChunk = world.getChunk(centerChunkX, centerChunkZ, ChunkStatus.FULL, false);
+			if (!(centerChunk instanceof WorldChunk)) {
 				return null;
 			}
 

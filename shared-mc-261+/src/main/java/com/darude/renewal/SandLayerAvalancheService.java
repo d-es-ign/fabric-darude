@@ -37,12 +37,16 @@ public final class SandLayerAvalancheService {
 			return;
 		}
 
-		ServerTickEvents.END_WORLD_TICK.register(SandLayerAvalancheService::onEndWorldTick);
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (ServerLevel world : server.getAllLevels()) {
+				onEndWorldTick(world);
+			}
+		});
 		registered = true;
 	}
 
 	public static void enqueue(ServerLevel world, BlockPos pos) {
-		String key = world.dimension().location().toString();
+		String key = world.dimension().getValue().toString();
 		ArrayDeque<BlockPos> queue = QUEUES.computeIfAbsent(key, ignored -> new ArrayDeque<>());
 		Set<Long> queued = QUEUED_KEYS.computeIfAbsent(key, ignored -> new HashSet<>());
 
@@ -61,7 +65,7 @@ public final class SandLayerAvalancheService {
 			return;
 		}
 
-		String key = world.dimension().location().toString();
+		String key = world.dimension().getValue().toString();
 		ArrayDeque<BlockPos> queue = QUEUES.get(key);
 		if (queue == null || queue.isEmpty()) {
 			return;
@@ -110,8 +114,8 @@ public final class SandLayerAvalancheService {
 		static WindowGrid create(ServerLevel world, BlockPos center, int chunkWindowRadius) {
 			int centerChunkX = center.getX() >> 4;
 			int centerChunkZ = center.getZ() >> 4;
-			LevelChunk centerChunk = world.getChunk(centerChunkX, centerChunkZ, ChunkStatus.FULL, false);
-			if (centerChunk == null) {
+			var centerChunk = world.getChunk(centerChunkX, centerChunkZ, ChunkStatus.FULL, false);
+			if (!(centerChunk instanceof LevelChunk)) {
 				return null;
 			}
 
