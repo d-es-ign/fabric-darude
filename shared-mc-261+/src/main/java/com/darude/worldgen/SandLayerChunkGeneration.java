@@ -34,6 +34,7 @@ public final class SandLayerChunkGeneration {
 	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
 	private static final int MAX_PLACEMENTS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_placements_per_chunk", 24);
 	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
+	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 96);
 	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -109,9 +110,20 @@ public final class SandLayerChunkGeneration {
 		int nearDesertChecks = 0;
 		boolean placementBudgetExhausted = false;
 		boolean timeBudgetExhausted = false;
+		boolean[] visitedColumns = new boolean[16 * 16];
+		int columnsToEvaluate = Math.max(1, Math.min(16 * 16, MAX_COLUMNS_PER_CHUNK));
+		int evaluatedColumns = 0;
 
-		for (int localX = 0; localX < 16; localX++) {
-			for (int localZ = 0; localZ < 16; localZ++) {
+		while (evaluatedColumns < columnsToEvaluate) {
+			int localX = random.nextInt(16);
+			int localZ = random.nextInt(16);
+			int columnIndex = (localX << 4) | localZ;
+			if (visitedColumns[columnIndex]) {
+				continue;
+			}
+			visitedColumns[columnIndex] = true;
+			evaluatedColumns++;
+
 				if (System.nanoTime() - startedAtNanos >= MAX_CHUNK_WORK_NANOS) {
 					timeBudgetExhausted = true;
 					break;
@@ -208,8 +220,7 @@ public final class SandLayerChunkGeneration {
 
 				setSandLayers(chunk, placementPos, layerCount);
 				placements++;
-			}
-
+			
 			if (placementBudgetExhausted || timeBudgetExhausted) {
 				break;
 			}
