@@ -40,6 +40,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean PROFILE_CHUNKGEN = Boolean.getBoolean("darude.debug.chunkgen.profile");
 	private static final long PROFILE_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.profile_min_ms", 1L) * 1_000_000L;
 	private static final long TRACE_DESERT_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.trace_desert_min_ms", 1L) * 1_000_000L;
+	private static final long TRACE_SUMMARY_INTERVAL_TICKS = Long.getLong("darude.debug.chunkgen.summary_interval_ticks", 40L);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -100,12 +101,15 @@ public final class SandLayerChunkGeneration {
 
 		TickBudgetState tickBudget = TICK_BUDGETS.computeIfAbsent(worldKey, ignored -> new TickBudgetState());
 		long currentTick = world.getTime();
+		emitSummaryIfDue(worldKey, tickBudget, currentTick);
 		if (tickBudget.tick != currentTick) {
 			tickBudget.tick = currentTick;
 			tickBudget.usedNanos = 0L;
 			tickBudget.loggedBudgetExhausted = false;
 		}
+		tickBudget.callbacks++;
 		if (tickBudget.usedNanos >= MAX_TICK_WORK_NANOS) {
+			tickBudget.tickBudgetDrops++;
 			if (!tickBudget.loggedBudgetExhausted && (DEBUG_HOTSPOTS || PROFILE_CHUNKGEN)) {
 				tickBudget.loggedBudgetExhausted = true;
 				DarudeMod.LOGGER.warn("Hotspot[chunkgen-tick-budget] world={} tick={} usedMs={} maxMs={}", worldKey, currentTick, tickBudget.usedNanos / 1_000_000L, MAX_TICK_WORK_NANOS / 1_000_000L);
@@ -124,6 +128,7 @@ public final class SandLayerChunkGeneration {
 		long precheckStartedAtNanos = System.nanoTime();
 		boolean fastBiomeSandstorm = isChunkLikelySandstormBiomeFast(world, chunkPos);
 		if (NEAR_DESERT_DISABLED && !fastBiomeSandstorm) {
+			tickBudget.skippedFastBiome++;
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-fast-biome] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
 			}
@@ -138,6 +143,7 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
 
 		if (!shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+			tickBudget.skippedPrecheck++;
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-precheck] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
 			}
@@ -289,6 +295,9 @@ public final class SandLayerChunkGeneration {
 		if (timeBudgetExhausted && DEBUG_HOTSPOTS) {
 			DarudeMod.LOGGER.warn("Hotspot[chunk-generation-budget] world={} chunk={} exhausted {} ms budget", worldKey, chunkPos, MAX_CHUNK_WORK_NANOS / 1_000_000L);
 		}
+		if (timeBudgetExhausted) {
+			tickBudget.chunkBudgetHits++;
+		}
 
 		long chunkElapsedNanos = System.nanoTime() - startedAtNanos;
 		if (PROFILE_CHUNKGEN || (DEBUG_HOTSPOTS && chunkElapsedNanos >= PROFILE_MIN_LOG_NANOS)) {
@@ -344,15 +353,64 @@ public final class SandLayerChunkGeneration {
 			placements,
 			startedAtNanos
 		);
+		tickBudget.processedChunks++;
+		tickBudget.totalPlacements += placements;
+		tickBudget.totalChunkNanos += chunkElapsedNanos;
 		} finally {
 			tickBudget.usedNanos += Math.max(0L, System.nanoTime() - callbackStartedAtNanos);
 		}
+	}
+
+	private static void emitSummaryIfDue(String worldKey, TickBudgetState tickBudget, long currentTick) {
+		if (tickBudget.summaryTick == Long.MIN_VALUE) {
+			tickBudget.summaryTick = currentTick;
+			return;
+		}
+
+		if (currentTick - tickBudget.summaryTick < TRACE_SUMMARY_INTERVAL_TICKS) {
+			return;
+		}
+
+		DarudeMod.LOGGER.info(
+			"Trace[chunkgen-summary] world={} ticks={} callbacks={} processed={} skipFastBiome={} skipPrecheck={} placements={} chunkBudgetHits={} tickBudgetDrops={} chunkMsTotal={} tickUsedMs={} tickMaxMs={}",
+			worldKey,
+			(currentTick - tickBudget.summaryTick),
+			tickBudget.callbacks,
+			tickBudget.processedChunks,
+			tickBudget.skippedFastBiome,
+			tickBudget.skippedPrecheck,
+			tickBudget.totalPlacements,
+			tickBudget.chunkBudgetHits,
+			tickBudget.tickBudgetDrops,
+			tickBudget.totalChunkNanos / 1_000_000L,
+			tickBudget.usedNanos / 1_000_000L,
+			MAX_TICK_WORK_NANOS / 1_000_000L
+		);
+
+		tickBudget.summaryTick = currentTick;
+		tickBudget.callbacks = 0L;
+		tickBudget.processedChunks = 0L;
+		tickBudget.skippedFastBiome = 0L;
+		tickBudget.skippedPrecheck = 0L;
+		tickBudget.totalPlacements = 0L;
+		tickBudget.chunkBudgetHits = 0L;
+		tickBudget.tickBudgetDrops = 0L;
+		tickBudget.totalChunkNanos = 0L;
 	}
 
 	private static final class TickBudgetState {
 		private long tick = Long.MIN_VALUE;
 		private long usedNanos = 0L;
 		private boolean loggedBudgetExhausted = false;
+		private long summaryTick = Long.MIN_VALUE;
+		private long callbacks = 0L;
+		private long processedChunks = 0L;
+		private long skippedFastBiome = 0L;
+		private long skippedPrecheck = 0L;
+		private long totalPlacements = 0L;
+		private long chunkBudgetHits = 0L;
+		private long tickBudgetDrops = 0L;
+		private long totalChunkNanos = 0L;
 	}
 
 	private static boolean shouldProcessChunk(
