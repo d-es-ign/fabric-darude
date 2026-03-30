@@ -1,6 +1,7 @@
 package com.darude.renewal;
 
 import com.darude.DarudeBlocks;
+import com.darude.DarudeDiagnostics;
 import com.darude.DarudeMod;
 import com.darude.block.SandLayerBlock;
 import com.darude.worldgen.SandLayerGenerationConfig;
@@ -77,10 +78,11 @@ public final class SandLayerFarmingService {
 		int[] operationsUsed = new int[]{0};
 		int[] verticalChecksUsed = new int[]{0};
 		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, config.maxFarmingOperationsPerTick() * 32);
+		long startedAtNanos = System.nanoTime();
 
 		for (long packedChunkPos : scannedChunks) {
 			if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
-				return;
+				break;
 			}
 
 			int chunkX = ChunkPos.getX(packedChunkPos);
@@ -92,6 +94,14 @@ public final class SandLayerFarmingService {
 
 			scanChunk(world, levelChunk, config, windDirection, random, biomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks);
 		}
+
+		DarudeDiagnostics.logFarmingTick(
+			world.dimension().location().toString(),
+			scannedChunks.size(),
+			operationsUsed[0],
+			verticalChecksUsed[0],
+			startedAtNanos
+		);
 	}
 
 	private static Set<Long> collectCandidateChunks(ServerLevel world) {

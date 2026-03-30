@@ -1,5 +1,6 @@
 package com.darude.renewal;
 
+import com.darude.DarudeDiagnostics;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.server.world.ServerWorld;
@@ -47,8 +48,10 @@ public final class SandstormWindService {
 			next = CARDINAL_DIRECTIONS[random.nextInt(CARDINAL_DIRECTIONS.length)];
 		}
 
+		Direction previous = state.direction;
 		state.direction = next;
 		state.nextShiftTick = time + WIND_SHIFT_TICKS;
+		DarudeDiagnostics.logWindShift(worldKey(world), previous.toString(), next.toString(), time);
 	}
 
 	private static String worldKey(ServerWorld world) {

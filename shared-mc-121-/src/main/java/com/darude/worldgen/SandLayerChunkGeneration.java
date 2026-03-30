@@ -1,6 +1,7 @@
 package com.darude.worldgen;
 
 import com.darude.DarudeBlocks;
+import com.darude.DarudeDiagnostics;
 import com.darude.DarudeMod;
 import com.darude.block.SandLayerBlock;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -66,6 +67,8 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
 		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
+		long startedAtNanos = System.nanoTime();
+		int placements = 0;
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
@@ -117,6 +120,7 @@ public final class SandLayerChunkGeneration {
 					}
 
 					setSandLayers(chunk, placementPos, layerCount);
+					placements++;
 					continue;
 				}
 
@@ -148,8 +152,16 @@ public final class SandLayerChunkGeneration {
 				}
 
 				setSandLayers(chunk, placementPos, layerCount);
+				placements++;
 			}
 		}
+
+		DarudeDiagnostics.logChunkGeneration(
+			world.getRegistryKey().getValue().toString(),
+			chunkPos.toString(),
+			placements,
+			startedAtNanos
+		);
 	}
 
 	private static void setSandLayers(WorldChunk chunk, BlockPos pos, int layerCount) {

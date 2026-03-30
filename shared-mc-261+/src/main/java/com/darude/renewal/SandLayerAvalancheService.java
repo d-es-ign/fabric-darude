@@ -1,6 +1,7 @@
 package com.darude.renewal;
 
 import com.darude.DarudeBlocks;
+import com.darude.DarudeDiagnostics;
 import com.darude.block.SandLayerBlock;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import com.darude.worldgen.SandLayerGenerationConfig;
@@ -75,7 +76,10 @@ public final class SandLayerAvalancheService {
 		}
 
 		Set<Long> queued = QUEUED_KEYS.get(world);
+		int queuedBefore = queue.size();
 		int processedCenters = 0;
+		int totalProcessedTopples = 0;
+		long startedAtNanos = System.nanoTime();
 		AvalancheRedistributor redistributor = new AvalancheRedistributor(config.avalancheSlopeThreshold());
 		while (remainingBudget > 0 && processedCenters < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty()) {
 			BlockPos center = queue.poll();
@@ -89,10 +93,20 @@ public final class SandLayerAvalancheService {
 				continue;
 			}
 
-			int processedTopples = redistributor.redistributeBudget(grid, remainingBudget);
-			remainingBudget -= processedTopples;
+			int topplesThisCenter = redistributor.redistributeBudget(grid, remainingBudget);
+			remainingBudget -= topplesThisCenter;
+			totalProcessedTopples += topplesThisCenter;
 			processedCenters++;
 		}
+
+		DarudeDiagnostics.logAvalancheTick(
+			world.dimension().location().toString(),
+			queuedBefore,
+			processedCenters,
+			totalProcessedTopples,
+			remainingBudget,
+			startedAtNanos
+		);
 	}
 
 	private static final class WindowGrid implements AvalancheRedistributor.Grid {
