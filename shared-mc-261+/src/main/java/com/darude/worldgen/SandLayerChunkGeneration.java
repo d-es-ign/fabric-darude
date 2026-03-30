@@ -32,6 +32,8 @@ public final class SandLayerChunkGeneration {
 	private static final TagKey<Block> SAND_LAYER_DESERT_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_desert_support"));
 	private static final TagKey<Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
 	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
+	private static final int MAX_PLACEMENTS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_placements_per_chunk", 24);
+	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -93,9 +95,16 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
 		long startedAtNanos = System.nanoTime();
 		int placements = 0;
+		int nearDesertChecks = 0;
+		boolean placementBudgetExhausted = false;
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
+				if (placements >= MAX_PLACEMENTS_PER_CHUNK) {
+					placementBudgetExhausted = true;
+					break;
+				}
+
 				int x = chunkPos.getMinBlockX() + localX;
 				int z = chunkPos.getMinBlockZ() + localZ;
 				int y = getTopYNoLeaves(world, x, z, topYNoLeavesCache);
@@ -160,6 +169,11 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
+				if (nearDesertChecks >= MAX_NEAR_DESERT_CHECKS_PER_CHUNK) {
+					continue;
+				}
+				nearDesertChecks++;
+
 				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache, nearDesertSandCache)) {
 					continue;
 				}
@@ -177,6 +191,10 @@ public final class SandLayerChunkGeneration {
 
 				setSandLayers(chunk, placementPos, layerCount);
 				placements++;
+			}
+
+			if (placementBudgetExhausted) {
+				break;
 			}
 		}
 
