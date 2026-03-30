@@ -100,7 +100,7 @@ public final class SandLayerAvalancheService {
 		}
 
 		DarudeDiagnostics.logAvalancheTick(
-			world.dimension().location().toString(),
+			world.dimension().getValue().toString(),
 			queuedBefore,
 			processedCenters,
 			totalProcessedTopples,

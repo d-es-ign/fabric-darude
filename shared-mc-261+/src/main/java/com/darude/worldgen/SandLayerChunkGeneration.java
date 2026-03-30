@@ -158,7 +158,7 @@ public final class SandLayerChunkGeneration {
 		}
 
 		DarudeDiagnostics.logChunkGeneration(
-			world.dimension().location().toString(),
+			world.dimension().getValue().toString(),
 			chunkPos.toString(),
 			placements,
 			startedAtNanos
