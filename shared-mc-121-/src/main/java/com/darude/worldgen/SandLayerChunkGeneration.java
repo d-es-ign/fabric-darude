@@ -35,7 +35,7 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
 	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 96);
 	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
-	private static final long MAX_TICK_WORK_NANOS = Long.getLong("darude.chunkgen.max_tick_work_ms", 6L) * 1_000_000L;
+	private static final long MAX_TICK_WORK_NANOS = Long.getLong("darude.chunkgen.max_tick_work_ms", 2L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
