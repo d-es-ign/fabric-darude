@@ -5,6 +5,7 @@ import com.darude.DarudeDiagnostics;
 import com.darude.DarudeMod;
 import com.darude.block.SandLayerBlock;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.registry.tag.BlockTags;
@@ -21,8 +22,11 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
 
+import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Deque;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -43,6 +47,7 @@ public final class SandLayerChunkGeneration {
 	private static final long TRACE_SUMMARY_INTERVAL_TICKS = Long.getLong("darude.debug.chunkgen.summary_interval_ticks", 40L);
 	private static final boolean TRACE_SUMMARY_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.summary");
 	private static final boolean TRACE_DESERT_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.trace_desert");
+	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 2);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -54,6 +59,7 @@ public final class SandLayerChunkGeneration {
 	private static final Map<String, Map<Long, Boolean>> NEAR_DESERT_REGION_CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, Map<Long, Boolean>> CHUNK_SANDSTORM_BIOME_CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, TickBudgetState> TICK_BUDGETS = new ConcurrentHashMap<>();
+	private static final Map<String, QueueState> QUEUES = new ConcurrentHashMap<>();
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][] QUICK_CHECK_DIRECTIONS = new int[][]{
@@ -73,9 +79,48 @@ public final class SandLayerChunkGeneration {
 
 	public static void register() {
 		ServerChunkEvents.CHUNK_GENERATE.register(SandLayerChunkGeneration::placeInGeneratedChunk);
+		ServerTickEvents.END_WORLD_TICK.register(SandLayerChunkGeneration::drainQueuedChunks);
 	}
 
 	private static void placeInGeneratedChunk(ServerWorld world, WorldChunk chunk) {
+		enqueueGeneratedChunk(world, chunk.getPos());
+	}
+
+	private static void enqueueGeneratedChunk(ServerWorld world, ChunkPos chunkPos) {
+		String worldKey = world.getRegistryKey().getValue().toString();
+		QueueState queueState = QUEUES.computeIfAbsent(worldKey, ignored -> new QueueState());
+		long packed = columnKey(chunkPos.x, chunkPos.z);
+		if (queueState.enqueued.add(packed)) {
+			queueState.queue.addLast(packed);
+		}
+	}
+
+	private static void drainQueuedChunks(ServerWorld world) {
+		if (CHUNKGEN_DISABLED) {
+			return;
+		}
+
+		String worldKey = world.getRegistryKey().getValue().toString();
+		QueueState queueState = QUEUES.computeIfAbsent(worldKey, ignored -> new QueueState());
+		for (int i = 0; i < MAX_QUEUED_CHUNKS_PER_TICK; i++) {
+			Long packed = queueState.queue.pollFirst();
+			if (packed == null) {
+				break;
+			}
+			queueState.enqueued.remove(packed);
+
+			int chunkX = unpackKeyX(packed);
+			int chunkZ = unpackKeyZ(packed);
+			WorldChunk chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (chunk == null) {
+				continue;
+			}
+
+			processGeneratedChunk(world, chunk);
+		}
+	}
+
+	private static void processGeneratedChunk(ServerWorld world, WorldChunk chunk) {
 		if (CHUNKGEN_DISABLED) {
 			String worldKey = world.getRegistryKey().getValue().toString();
 			if (STARTUP_SKIP_LOGGED_WORLDS.add("disabled:" + worldKey)) {
@@ -417,6 +462,11 @@ public final class SandLayerChunkGeneration {
 		private long chunkBudgetHits = 0L;
 		private long tickBudgetDrops = 0L;
 		private long totalChunkNanos = 0L;
+	}
+
+	private static final class QueueState {
+		private final Deque<Long> queue = new ArrayDeque<>();
+		private final Set<Long> enqueued = new HashSet<>();
 	}
 
 	private static boolean shouldProcessChunk(
@@ -788,6 +838,14 @@ public final class SandLayerChunkGeneration {
 
 	private static long columnKey(int x, int z) {
 		return (((long) x) << 32) ^ (z & 0xffffffffL);
+	}
+
+	private static int unpackKeyX(long key) {
+		return (int) (key >> 32);
+	}
+
+	private static int unpackKeyZ(long key) {
+		return (int) key;
 	}
 
 	private static boolean shouldSampleNearDesertColumn(ChunkPos chunkPos, int localX, int localZ, int numerator, int denominator) {
