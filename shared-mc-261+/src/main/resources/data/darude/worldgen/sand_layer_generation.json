@@ -8,7 +8,7 @@
   "near_desert_column_sample_numerator": 6,
   "near_desert_column_sample_denominator": 8,
   "near_desert_spawnable_support_mode": "full_block",
-  "farming_tick_interval_ticks": 20,
+  "farming_tick_interval_ticks": 40,
   "base_under_grate_chance": 0.03,
   "base_pyramid_side_chance": 0.02,
   "full_pyramid_side_chance": 0.024,

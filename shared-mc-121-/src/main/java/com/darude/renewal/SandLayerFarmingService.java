@@ -34,7 +34,8 @@ import java.util.TreeSet;
  */
 public final class SandLayerFarmingService {
 	private static final int PLAYER_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.player_chunk_scan_radius", 4);
-	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 2048;
+	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 256;
+	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.getBoolean("darude.farming.disable");
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
@@ -76,6 +77,7 @@ public final class SandLayerFarmingService {
 		Random random = world.getRandom();
 		Set<Long> scannedChunks = collectCandidateChunks(world);
 		Map<Long, Boolean> biomeCache = new HashMap<>();
+		Map<Long, Boolean> chunkBiomeCache = new HashMap<>();
 		int[] operationsUsed = new int[]{0};
 		int[] verticalChecksUsed = new int[]{0};
 		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, config.maxFarmingOperationsPerTick() * 32);
@@ -98,7 +100,7 @@ public final class SandLayerFarmingService {
 				continue;
 			}
 
-			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
+			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
 		}
 
 		if (System.nanoTime() >= deadlineNanos && Boolean.getBoolean("darude.debug.hotspots")) {
@@ -134,12 +136,17 @@ public final class SandLayerFarmingService {
 		Direction windDirection,
 		Random random,
 		Map<Long, Boolean> biomeCache,
+		Map<Long, Boolean> chunkBiomeCache,
 		int[] operationsUsed,
 		int[] verticalChecksUsed,
 		int maxVerticalChecks,
 		long deadlineNanos
 	) {
 		ChunkPos chunkPos = chunk.getPos();
+		if (!isChunkInSandstormBiome(world, chunkPos, chunkBiomeCache)) {
+			return;
+		}
+
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
 				if (System.nanoTime() >= deadlineNanos) {
@@ -156,14 +163,14 @@ public final class SandLayerFarmingService {
 					continue;
 				}
 
-				int seaLevel = world.getSeaLevel();
-				int minY = Math.max(world.getBottomY(), seaLevel);
-				int maxY = Math.min(world.getTopYInclusive(), world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1);
-				if (maxY < minY) {
+				int topSurfaceY = Math.min(world.getTopYInclusive(), world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1);
+				if (topSurfaceY < world.getBottomY()) {
 					continue;
 				}
 
-				for (int y = minY; y <= maxY; y++) {
+				int minY = Math.max(world.getBottomY(), topSurfaceY - MAX_EMITTER_DEPTH_FROM_SURFACE);
+
+				for (int y = topSurfaceY; y >= minY; y--) {
 					if (System.nanoTime() >= deadlineNanos) {
 						return;
 					}
@@ -186,6 +193,21 @@ public final class SandLayerFarmingService {
 				}
 			}
 		}
+	}
+
+	private static boolean isChunkInSandstormBiome(ServerWorld world, ChunkPos chunkPos, Map<Long, Boolean> chunkBiomeCache) {
+		long key = chunkPos.toLong();
+		Boolean cached = chunkBiomeCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		int centerX = chunkPos.getStartX() + 8;
+		int centerZ = chunkPos.getStartZ() + 8;
+		int sampleY = Math.max(world.getBottomY() + 1, world.getSeaLevel());
+		boolean inBiome = world.getBiome(new BlockPos(centerX, sampleY, centerZ)).isIn(SANDSTORM_BIOMES);
+		chunkBiomeCache.put(key, inBiome);
+		return inBiome;
 	}
 
 	private static boolean processEmitterAt(
