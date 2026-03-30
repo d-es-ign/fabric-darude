@@ -16,7 +16,7 @@
   "full_pyramid_erode_to_pyramid_chance": 0.005,
   "pyramid_break_chance": 0.002,
   "max_fallthrough_depth": 12,
-  "max_farming_operations_per_tick": 512,
+  "max_farming_operations_per_tick": 64,
   "avalanche_slope_threshold": 3,
-  "max_topples_per_tick": 256
+  "max_topples_per_tick": 64
 }

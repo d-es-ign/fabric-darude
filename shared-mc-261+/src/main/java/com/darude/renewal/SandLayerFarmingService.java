@@ -34,8 +34,10 @@ import java.util.TreeSet;
  * Kept separate from initial chunk/world generation logic.
  */
 public final class SandLayerFarmingService {
-	private static final int PLAYER_CHUNK_SCAN_RADIUS = 8;
+	private static final int PLAYER_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.player_chunk_scan_radius", 4);
 	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 2048;
+	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
+	private static final boolean FARMING_DISABLED = Boolean.getBoolean("darude.farming.disable");
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<Block> FARMING_EMITTERS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
@@ -57,6 +59,10 @@ public final class SandLayerFarmingService {
 	}
 
 	private static void onEndWorldTick(ServerLevel world) {
+		if (FARMING_DISABLED) {
+			return;
+		}
+
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 		if (config.maxFarmingOperationsPerTick() <= 0) {
 			return;
@@ -79,8 +85,13 @@ public final class SandLayerFarmingService {
 		int[] verticalChecksUsed = new int[]{0};
 		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, config.maxFarmingOperationsPerTick() * 32);
 		long startedAtNanos = System.nanoTime();
+		long deadlineNanos = startedAtNanos + MAX_FARMING_WORK_NANOS;
 
 		for (long packedChunkPos : scannedChunks) {
+			if (System.nanoTime() >= deadlineNanos) {
+				break;
+			}
+
 			if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
 				break;
 			}
@@ -92,7 +103,11 @@ public final class SandLayerFarmingService {
 				continue;
 			}
 
-			scanChunk(world, levelChunk, config, windDirection, random, biomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks);
+			scanChunk(world, levelChunk, config, windDirection, random, biomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
+		}
+
+		if (System.nanoTime() >= deadlineNanos && Boolean.getBoolean("darude.debug.hotspots")) {
+			DarudeMod.LOGGER.warn("Hotspot[farming-budget] world={} exhausted {} ms budget", world.dimension(), MAX_FARMING_WORK_NANOS / 1_000_000L);
 		}
 
 		DarudeDiagnostics.logFarmingTick(
@@ -126,11 +141,16 @@ public final class SandLayerFarmingService {
 		Map<Long, Boolean> biomeCache,
 		int[] operationsUsed,
 		int[] verticalChecksUsed,
-		int maxVerticalChecks
+		int maxVerticalChecks,
+		long deadlineNanos
 	) {
 		ChunkPos chunkPos = chunk.getPos();
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
+				if (System.nanoTime() >= deadlineNanos) {
+					return;
+				}
+
 				if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
 					return;
 				}
@@ -150,6 +170,10 @@ public final class SandLayerFarmingService {
 				}
 
 				for (int y = minY; y <= maxY; y++) {
+					if (System.nanoTime() >= deadlineNanos) {
+						return;
+					}
+
 					if (verticalChecksUsed[0]++ >= maxVerticalChecks) {
 						return;
 					}

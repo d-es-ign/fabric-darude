@@ -27,6 +27,8 @@ import java.util.Set;
 public final class SandLayerAvalancheService {
 	private static final int MAX_QUEUED_CELLS_PER_TICK = 128;
 	private static final int CHUNK_WINDOW_RADIUS = 1;
+	private static final long MAX_AVALANCHE_WORK_NANOS = Long.getLong("darude.avalanche.max_work_ms", 2L) * 1_000_000L;
+	private static final boolean AVALANCHE_DISABLED = Boolean.getBoolean("darude.avalanche.disable");
 	private static final Map<String, ArrayDeque<BlockPos>> QUEUES = new HashMap<>();
 	private static final Map<String, Set<Long>> QUEUED_KEYS = new HashMap<>();
 	private static boolean registered;
@@ -61,6 +63,10 @@ public final class SandLayerAvalancheService {
 	}
 
 	private static void onEndWorldTick(ServerWorld world) {
+		if (AVALANCHE_DISABLED) {
+			return;
+		}
+
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 		int remainingBudget = config.maxTopplesPerTick();
 		if (remainingBudget <= 0) {
@@ -78,8 +84,9 @@ public final class SandLayerAvalancheService {
 		int processedCenters = 0;
 		int totalProcessedTopples = 0;
 		long startedAtNanos = System.nanoTime();
+		long deadlineNanos = startedAtNanos + MAX_AVALANCHE_WORK_NANOS;
 		AvalancheRedistributor redistributor = new AvalancheRedistributor(config.avalancheSlopeThreshold());
-		while (remainingBudget > 0 && processedCenters < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty()) {
+		while (remainingBudget > 0 && processedCenters < MAX_QUEUED_CELLS_PER_TICK && !queue.isEmpty() && System.nanoTime() < deadlineNanos) {
 			BlockPos center = queue.poll();
 			if (queued != null) {
 				queued.remove(center.asLong());
