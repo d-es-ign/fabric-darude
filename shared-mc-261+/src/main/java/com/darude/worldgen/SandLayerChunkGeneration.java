@@ -36,6 +36,7 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
 	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 96);
 	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
+	private static final long MAX_TICK_WORK_NANOS = Long.getLong("darude.chunkgen.max_tick_work_ms", 6L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -46,6 +47,7 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_CHUNK_BIOME_CACHE_ENTRIES = Integer.getInteger("darude.chunkgen.max_chunk_biome_cache_entries", 32768);
 	private static final Map<String, Map<Long, Boolean>> NEAR_DESERT_REGION_CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, Map<Long, Boolean>> CHUNK_SANDSTORM_BIOME_CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, TickBudgetState> TICK_BUDGETS = new ConcurrentHashMap<>();
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][] QUICK_CHECK_DIRECTIONS = new int[][]{
@@ -93,10 +95,22 @@ public final class SandLayerChunkGeneration {
 			DarudeMod.LOGGER.info("Darude chunk generation active for world={} at tick={}", worldKey, world.getGameTime());
 		}
 
-		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
-		if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
+		TickBudgetState tickBudget = TICK_BUDGETS.computeIfAbsent(worldKey, ignored -> new TickBudgetState());
+		long currentTick = world.getGameTime();
+		if (tickBudget.tick != currentTick) {
+			tickBudget.tick = currentTick;
+			tickBudget.usedNanos = 0L;
+		}
+		if (tickBudget.usedNanos >= MAX_TICK_WORK_NANOS) {
 			return;
 		}
+
+		long callbackStartedAtNanos = System.nanoTime();
+		try {
+			SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
+			if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
+				return;
+			}
 
 		ChunkPos chunkPos = chunk.getPos();
 		long seed = world.getSeed() ^ chunkPos.pack();
@@ -245,6 +259,14 @@ public final class SandLayerChunkGeneration {
 			placements,
 			startedAtNanos
 		);
+		} finally {
+			tickBudget.usedNanos += Math.max(0L, System.nanoTime() - callbackStartedAtNanos);
+		}
+	}
+
+	private static final class TickBudgetState {
+		private long tick = Long.MIN_VALUE;
+		private long usedNanos = 0L;
 	}
 
 	private static boolean shouldProcessChunk(
