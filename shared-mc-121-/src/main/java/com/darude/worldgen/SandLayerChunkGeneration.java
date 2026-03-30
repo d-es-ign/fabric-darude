@@ -36,6 +36,9 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 96);
 	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
 	private static final long MAX_TICK_WORK_NANOS = Long.getLong("darude.chunkgen.max_tick_work_ms", 2L) * 1_000_000L;
+	private static final boolean DEBUG_HOTSPOTS = Boolean.getBoolean("darude.debug.hotspots");
+	private static final boolean PROFILE_CHUNKGEN = Boolean.getBoolean("darude.debug.chunkgen.profile");
+	private static final long PROFILE_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.profile_min_ms", 1L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -99,8 +102,13 @@ public final class SandLayerChunkGeneration {
 		if (tickBudget.tick != currentTick) {
 			tickBudget.tick = currentTick;
 			tickBudget.usedNanos = 0L;
+			tickBudget.loggedBudgetExhausted = false;
 		}
 		if (tickBudget.usedNanos >= MAX_TICK_WORK_NANOS) {
+			if (!tickBudget.loggedBudgetExhausted && (DEBUG_HOTSPOTS || PROFILE_CHUNKGEN)) {
+				tickBudget.loggedBudgetExhausted = true;
+				DarudeMod.LOGGER.warn("Hotspot[chunkgen-tick-budget] world={} tick={} usedMs={} maxMs={}", worldKey, currentTick, tickBudget.usedNanos / 1_000_000L, MAX_TICK_WORK_NANOS / 1_000_000L);
+			}
 			return;
 		}
 
@@ -112,7 +120,11 @@ public final class SandLayerChunkGeneration {
 			}
 
 		ChunkPos chunkPos = chunk.getPos();
+		long precheckStartedAtNanos = System.nanoTime();
 		if (NEAR_DESERT_DISABLED && !isChunkLikelySandstormBiomeFast(world, chunkPos)) {
+			if (PROFILE_CHUNKGEN) {
+				DarudeMod.LOGGER.info("Profile[chunkgen-skip-fast-biome] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
+			}
 			return;
 		}
 
@@ -124,14 +136,24 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
 
 		if (!shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+			if (PROFILE_CHUNKGEN) {
+				DarudeMod.LOGGER.info("Profile[chunkgen-skip-precheck] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
+			}
 			return;
 		}
+ 
+		long precheckNanos = System.nanoTime() - precheckStartedAtNanos;
 
 		long startedAtNanos = System.nanoTime();
 		int placements = 0;
 		int nearDesertChecks = 0;
+		int biomeChecks = 0;
+		int nearDesertProbes = 0;
 		boolean placementBudgetExhausted = false;
 		boolean timeBudgetExhausted = false;
+		long topYNanos = 0L;
+		long biomeCheckNanos = 0L;
+		long nearDesertProbeNanos = 0L;
 		boolean[] visitedColumns = new boolean[16 * 16];
 		int columnsToEvaluate = Math.max(1, Math.min(16 * 16, MAX_COLUMNS_PER_CHUNK));
 		int evaluatedColumns = 0;
@@ -158,7 +180,9 @@ public final class SandLayerChunkGeneration {
 
 				int x = chunkPos.getStartX() + localX;
 				int z = chunkPos.getStartZ() + localZ;
+				long phaseStartedAtNanos = System.nanoTime();
 				int y = getTopYNoLeaves(world, x, z, topYNoLeavesCache);
+				topYNanos += (System.nanoTime() - phaseStartedAtNanos);
 
 				if (y < world.getBottomY() || y > world.getTopYInclusive()) {
 					continue;
@@ -169,7 +193,11 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (isInSandstormBiome(world, placementPos, biomeInSandstormCache)) {
+				phaseStartedAtNanos = System.nanoTime();
+				boolean inSandstormBiome = isInSandstormBiome(world, placementPos, biomeInSandstormCache);
+				biomeCheckNanos += (System.nanoTime() - phaseStartedAtNanos);
+				biomeChecks++;
+				if (inSandstormBiome) {
 					if (!world.isSkyVisible(placementPos)) {
 						continue;
 					}
@@ -229,7 +257,11 @@ public final class SandLayerChunkGeneration {
 				}
 				nearDesertChecks++;
 
-				if (!isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache, nearDesertSandCache)) {
+				phaseStartedAtNanos = System.nanoTime();
+				boolean nearDesertSand = isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache, nearDesertSandCache);
+				nearDesertProbeNanos += (System.nanoTime() - phaseStartedAtNanos);
+				nearDesertProbes++;
+				if (!nearDesertSand) {
 					continue;
 				}
 
@@ -252,8 +284,35 @@ public final class SandLayerChunkGeneration {
 			}
 		}
 
-		if (timeBudgetExhausted && Boolean.getBoolean("darude.debug.hotspots")) {
+		if (timeBudgetExhausted && DEBUG_HOTSPOTS) {
 			DarudeMod.LOGGER.warn("Hotspot[chunk-generation-budget] world={} chunk={} exhausted {} ms budget", worldKey, chunkPos, MAX_CHUNK_WORK_NANOS / 1_000_000L);
+		}
+
+		long chunkElapsedNanos = System.nanoTime() - startedAtNanos;
+		if (PROFILE_CHUNKGEN || (DEBUG_HOTSPOTS && chunkElapsedNanos >= PROFILE_MIN_LOG_NANOS)) {
+			DarudeMod.LOGGER.info(
+				"Profile[chunkgen] world={} chunk={} precheckMs={} chunkMs={} cols={}/{} placements={} biomeChecks={} nearDesertChecks={} nearDesertProbes={} topYMs={} biomeMs={} nearDesertMs={} caches[chunk={},topY={},biome={},nearDesert={}] budgetHit[chunk={},tickUsedMs={},tickMaxMs={}]",
+				worldKey,
+				chunkPos,
+				precheckNanos / 1_000_000L,
+				chunkElapsedNanos / 1_000_000L,
+				evaluatedColumns,
+				columnsToEvaluate,
+				placements,
+				biomeChecks,
+				nearDesertChecks,
+				nearDesertProbes,
+				topYNanos / 1_000_000L,
+				biomeCheckNanos / 1_000_000L,
+				nearDesertProbeNanos / 1_000_000L,
+				chunkAvailabilityCache.size(),
+				topYNoLeavesCache.size(),
+				biomeInSandstormCache.size(),
+				nearDesertSandCache.size(),
+				timeBudgetExhausted,
+				tickBudget.usedNanos / 1_000_000L,
+				MAX_TICK_WORK_NANOS / 1_000_000L
+			);
 		}
 
 		DarudeDiagnostics.logChunkGeneration(
@@ -270,6 +329,7 @@ public final class SandLayerChunkGeneration {
 	private static final class TickBudgetState {
 		private long tick = Long.MIN_VALUE;
 		private long usedNanos = 0L;
+		private boolean loggedBudgetExhausted = false;
 	}
 
 	private static boolean shouldProcessChunk(
