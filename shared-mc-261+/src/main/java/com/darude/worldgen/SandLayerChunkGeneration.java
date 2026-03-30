@@ -40,6 +40,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean DEBUG_HOTSPOTS = Boolean.getBoolean("darude.debug.hotspots");
 	private static final boolean PROFILE_CHUNKGEN = Boolean.getBoolean("darude.debug.chunkgen.profile");
 	private static final long PROFILE_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.profile_min_ms", 1L) * 1_000_000L;
+	private static final long TRACE_DESERT_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.trace_desert_min_ms", 1L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -122,7 +123,8 @@ public final class SandLayerChunkGeneration {
 
 		ChunkPos chunkPos = chunk.getPos();
 		long precheckStartedAtNanos = System.nanoTime();
-		if (NEAR_DESERT_DISABLED && !isChunkLikelySandstormBiomeFast(world, chunkPos)) {
+		boolean fastBiomeSandstorm = isChunkLikelySandstormBiomeFast(world, chunkPos);
+		if (NEAR_DESERT_DISABLED && !fastBiomeSandstorm) {
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-fast-biome] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
 			}
@@ -310,6 +312,27 @@ public final class SandLayerChunkGeneration {
 				topYNoLeavesCache.size(),
 				biomeInSandstormCache.size(),
 				nearDesertSandCache.size(),
+				timeBudgetExhausted,
+				tickBudget.usedNanos / 1_000_000L,
+				MAX_TICK_WORK_NANOS / 1_000_000L
+			);
+		}
+
+		if (fastBiomeSandstorm && chunkElapsedNanos >= TRACE_DESERT_MIN_LOG_NANOS) {
+			DarudeMod.LOGGER.warn(
+				"Trace[chunkgen-desert] world={} chunk={} chunkMs={} cols={}/{} placements={} biomeChecks={} nearDesertChecks={} nearDesertProbes={} topYMs={} biomeMs={} nearDesertMs={} budgetHit[chunk={},tickUsedMs={},tickMaxMs={}]",
+				worldKey,
+				chunkPos,
+				chunkElapsedNanos / 1_000_000L,
+				evaluatedColumns,
+				columnsToEvaluate,
+				placements,
+				biomeChecks,
+				nearDesertChecks,
+				nearDesertProbes,
+				topYNanos / 1_000_000L,
+				biomeCheckNanos / 1_000_000L,
+				nearDesertProbeNanos / 1_000_000L,
 				timeBudgetExhausted,
 				tickBudget.usedNanos / 1_000_000L,
 				MAX_TICK_WORK_NANOS / 1_000_000L
