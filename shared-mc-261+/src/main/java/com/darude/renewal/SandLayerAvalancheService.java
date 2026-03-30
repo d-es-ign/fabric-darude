@@ -28,7 +28,7 @@ public final class SandLayerAvalancheService {
 	private static final int MAX_QUEUED_CELLS_PER_TICK = 128;
 	private static final int CHUNK_WINDOW_RADIUS = 1;
 	private static final long MAX_AVALANCHE_WORK_NANOS = Long.getLong("darude.avalanche.max_work_ms", 2L) * 1_000_000L;
-	private static final boolean AVALANCHE_DISABLED = Boolean.getBoolean("darude.avalanche.disable");
+	private static final boolean AVALANCHE_DISABLED = Boolean.parseBoolean(System.getProperty("darude.avalanche.disable", "true"));
 	private static final Map<ServerLevel, ArrayDeque<BlockPos>> QUEUES = new HashMap<>();
 	private static final Map<ServerLevel, Set<Long>> QUEUED_KEYS = new HashMap<>();
 	private static boolean registered;
