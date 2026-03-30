@@ -37,6 +37,11 @@ public final class SandLayerChunkGeneration {
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
+	private static final int REGION_SHIFT = 3; // 8x8 chunk regions
+	private static final int MAX_REGION_CACHE_ENTRIES = Integer.getInteger("darude.chunkgen.max_region_cache_entries", 8192);
+	private static final int MAX_CHUNK_BIOME_CACHE_ENTRIES = Integer.getInteger("darude.chunkgen.max_chunk_biome_cache_entries", 32768);
+	private static final Map<String, Map<Long, Boolean>> NEAR_DESERT_REGION_CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, Map<Long, Boolean>> CHUNK_SANDSTORM_BIOME_CACHE = new ConcurrentHashMap<>();
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][] QUICK_CHECK_DIRECTIONS = new int[][]{
@@ -92,6 +97,11 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
 		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
+
+		if (!shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+			return;
+		}
+
 		long startedAtNanos = System.nanoTime();
 		int placements = 0;
 		int nearDesertChecks = 0;
@@ -198,11 +208,106 @@ public final class SandLayerChunkGeneration {
 		}
 
 		DarudeDiagnostics.logChunkGeneration(
-			world.getRegistryKey().getValue().toString(),
+			worldKey,
 			chunkPos.toString(),
 			placements,
 			startedAtNanos
 		);
+	}
+
+	private static boolean shouldProcessChunk(
+		ServerWorld world,
+		String worldKey,
+		ChunkPos chunkPos,
+		int nearDesertDistance,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Boolean> biomeInSandstormCache
+	) {
+		if (isChunkInSandstormBiome(world, worldKey, chunkPos, chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+			return true;
+		}
+
+		if (nearDesertDistance <= 0) {
+			return false;
+		}
+
+		return isChunkInNearDesertRegion(world, worldKey, chunkPos, nearDesertDistance, chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache);
+	}
+
+	private static boolean isChunkInNearDesertRegion(
+		ServerWorld world,
+		String worldKey,
+		ChunkPos chunkPos,
+		int nearDesertDistance,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Boolean> biomeInSandstormCache
+	) {
+		int regionX = chunkPos.x >> REGION_SHIFT;
+		int regionZ = chunkPos.z >> REGION_SHIFT;
+		long regionKey = columnKey(regionX, regionZ);
+
+		Map<Long, Boolean> worldRegionCache = NEAR_DESERT_REGION_CACHE.computeIfAbsent(worldKey, ignored -> new ConcurrentHashMap<>());
+		Boolean cached = worldRegionCache.get(regionKey);
+		if (cached != null) {
+			return cached;
+		}
+
+		int chunkRadius = Math.max(1, (nearDesertDistance + 2 + 15) / 16);
+		int regionStartX = regionX << REGION_SHIFT;
+		int regionStartZ = regionZ << REGION_SHIFT;
+		int regionEndX = regionStartX + ((1 << REGION_SHIFT) - 1);
+		int regionEndZ = regionStartZ + ((1 << REGION_SHIFT) - 1);
+
+		boolean nearDesert = false;
+		for (int cx = regionStartX - chunkRadius; cx <= regionEndX + chunkRadius && !nearDesert; cx++) {
+			for (int cz = regionStartZ - chunkRadius; cz <= regionEndZ + chunkRadius; cz++) {
+				if (isChunkInSandstormBiome(world, worldKey, new ChunkPos(cx, cz), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+					nearDesert = true;
+					break;
+				}
+			}
+		}
+
+		if (worldRegionCache.size() > MAX_REGION_CACHE_ENTRIES) {
+			worldRegionCache.clear();
+		}
+		worldRegionCache.put(regionKey, nearDesert);
+		return nearDesert;
+	}
+
+	private static boolean isChunkInSandstormBiome(
+		ServerWorld world,
+		String worldKey,
+		ChunkPos chunkPos,
+		Map<Long, Boolean> chunkAvailabilityCache,
+		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Boolean> biomeInSandstormCache
+	) {
+		long key = chunkPos.toLong();
+		Map<Long, Boolean> worldChunkBiomeCache = CHUNK_SANDSTORM_BIOME_CACHE.computeIfAbsent(worldKey, ignored -> new ConcurrentHashMap<>());
+		Boolean cached = worldChunkBiomeCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
+
+		int centerX = chunkPos.getStartX() + 8;
+		int centerZ = chunkPos.getStartZ() + 8;
+		boolean available = isChunkAvailableForLookup(world, centerX, centerZ, chunkAvailabilityCache);
+		boolean inBiome = false;
+		if (available) {
+			int centerY = getTopYNoLeaves(world, centerX, centerZ, topYNoLeavesCache);
+			if (centerY >= world.getBottomY() && centerY <= world.getTopYInclusive()) {
+				inBiome = isInSandstormBiome(world, new BlockPos(centerX, centerY, centerZ), biomeInSandstormCache);
+			}
+		}
+
+		if (worldChunkBiomeCache.size() > MAX_CHUNK_BIOME_CACHE_ENTRIES) {
+			worldChunkBiomeCache.clear();
+		}
+		worldChunkBiomeCache.put(key, inBiome);
+		return inBiome;
 	}
 
 	private static void setSandLayers(WorldChunk chunk, BlockPos pos, int layerCount) {
