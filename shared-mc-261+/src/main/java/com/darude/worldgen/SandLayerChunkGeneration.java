@@ -42,7 +42,7 @@ public final class SandLayerChunkGeneration {
 	private static final long PROFILE_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.profile_min_ms", 1L) * 1_000_000L;
 	private static final long TRACE_DESERT_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.trace_desert_min_ms", 1L) * 1_000_000L;
 	private static final long TRACE_SUMMARY_INTERVAL_TICKS = Long.getLong("darude.debug.chunkgen.summary_interval_ticks", 40L);
-	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "true"));
+	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
