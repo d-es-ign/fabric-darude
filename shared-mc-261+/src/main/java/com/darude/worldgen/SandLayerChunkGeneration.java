@@ -52,10 +52,6 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static void placeInGeneratedChunk(ServerLevel world, LevelChunk chunk) {
-		if (world.players().isEmpty()) {
-			return;
-		}
-
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 		if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
 			return;
