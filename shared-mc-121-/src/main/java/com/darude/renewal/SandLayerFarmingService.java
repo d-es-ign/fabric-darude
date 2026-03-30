@@ -321,10 +321,6 @@ public final class SandLayerFarmingService {
 	}
 
 	private static boolean isQualifiedEmitter(ServerWorld world, BlockPos pos, Map<Long, Boolean> biomeCache) {
-		if (!world.isRaining()) {
-			return false;
-		}
-
 		if (!world.isSkyVisible(pos.up())) {
 			return false;
 		}

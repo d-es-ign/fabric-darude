@@ -35,6 +35,10 @@ public final class SandstormWindService {
 	}
 
 	private static void tickWorld(ServerWorld world) {
+		if (!world.isRaining()) {
+			return;
+		}
+
 		long time = world.getTime();
 		String key = worldKey(world);
 		WindState state = STATES.computeIfAbsent(key, ignored -> new WindState(Direction.NORTH, time));
