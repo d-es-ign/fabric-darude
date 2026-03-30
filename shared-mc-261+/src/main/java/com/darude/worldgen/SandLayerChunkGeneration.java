@@ -37,6 +37,7 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 96);
 	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
+	private static final boolean NEAR_DESERT_DISABLED = Boolean.getBoolean("darude.chunkgen.near_desert.disable");
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
@@ -84,6 +85,10 @@ public final class SandLayerChunkGeneration {
 		}
 
 		String worldKey = world.dimension().toString();
+		if (NEAR_DESERT_DISABLED && STARTUP_SKIP_LOGGED_WORLDS.add("near-desert-disabled:" + worldKey)) {
+			DarudeMod.LOGGER.warn("Darude near-desert chunk generation disabled via -Ddarude.chunkgen.near_desert.disable=true for world={}", worldKey);
+		}
+
 		if (CHUNKGEN_ENABLED_LOGGED_WORLDS.add(worldKey)) {
 			DarudeMod.LOGGER.info("Darude chunk generation active for world={} at tick={}", worldKey, world.getGameTime());
 		}
@@ -190,6 +195,10 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
+				if (NEAR_DESERT_DISABLED) {
+					continue;
+				}
+
 				if (!shouldSampleNearDesertColumn(chunkPos, localX, localZ, config.nearDesertColumnSampleNumerator(), config.nearDesertColumnSampleDenominator())) {
 					continue;
 				}
@@ -251,7 +260,7 @@ public final class SandLayerChunkGeneration {
 			return true;
 		}
 
-		if (nearDesertDistance <= 0) {
+		if (nearDesertDistance <= 0 || NEAR_DESERT_DISABLED) {
 			return false;
 		}
 
