@@ -3,7 +3,8 @@
   "textures": {
     "top": "minecraft:block/sand",
     "bottom": "minecraft:block/sand",
-    "side": "minecraft:block/sand"
+    "side": "minecraft:block/sand",
+    "particle": "#side"
   },
   "elements": [
     {

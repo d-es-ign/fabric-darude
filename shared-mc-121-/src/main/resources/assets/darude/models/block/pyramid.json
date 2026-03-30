@@ -1,9 +1,10 @@
 {
   "parent": "block/block",
   "textures": {
-    "top": "minecraft:block/smooth_sandstone_top",
-    "bottom": "minecraft:block/smooth_sandstone_bottom",
-    "side": "minecraft:block/smooth_sandstone"
+    "top": "minecraft:block/sandstone_top",
+    "bottom": "minecraft:block/sandstone_bottom",
+    "side": "minecraft:block/sandstone",
+    "particle": "#side"
   },
   "elements": [
     {
