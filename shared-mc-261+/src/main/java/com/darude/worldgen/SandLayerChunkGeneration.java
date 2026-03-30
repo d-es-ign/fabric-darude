@@ -32,16 +32,18 @@ public final class SandLayerChunkGeneration {
 	private static final TagKey<Block> SAND_LAYER_DESERT_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_desert_support"));
 	private static final TagKey<Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
 	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
-	private static final int MAX_PLACEMENTS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_placements_per_chunk", 24);
+	private static final int MAX_PLACEMENTS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_placements_per_chunk", 8);
 	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
-	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 96);
-	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
+	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 16);
+	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 1L) * 1_000_000L;
 	private static final long MAX_TICK_WORK_NANOS = Long.getLong("darude.chunkgen.max_tick_work_ms", 2L) * 1_000_000L;
 	private static final boolean DEBUG_HOTSPOTS = Boolean.getBoolean("darude.debug.hotspots");
 	private static final boolean PROFILE_CHUNKGEN = Boolean.getBoolean("darude.debug.chunkgen.profile");
 	private static final long PROFILE_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.profile_min_ms", 1L) * 1_000_000L;
 	private static final long TRACE_DESERT_MIN_LOG_NANOS = Long.getLong("darude.debug.chunkgen.trace_desert_min_ms", 1L) * 1_000_000L;
 	private static final long TRACE_SUMMARY_INTERVAL_TICKS = Long.getLong("darude.debug.chunkgen.summary_interval_ticks", 40L);
+	private static final boolean TRACE_SUMMARY_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.summary");
+	private static final boolean TRACE_DESERT_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.trace_desert");
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -327,7 +329,7 @@ public final class SandLayerChunkGeneration {
 			);
 		}
 
-		if (fastBiomeSandstorm && chunkElapsedNanos >= TRACE_DESERT_MIN_LOG_NANOS) {
+		if (TRACE_DESERT_ENABLED && fastBiomeSandstorm && chunkElapsedNanos >= TRACE_DESERT_MIN_LOG_NANOS) {
 			DarudeMod.LOGGER.warn(
 				"Trace[chunkgen-desert] world={} chunk={} chunkMs={} cols={}/{} placements={} biomeChecks={} nearDesertChecks={} nearDesertProbes={} topYMs={} biomeMs={} nearDesertMs={} budgetHit[chunk={},tickUsedMs={},tickMaxMs={}]",
 				worldKey,
@@ -363,6 +365,10 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static void emitSummaryIfDue(String worldKey, TickBudgetState tickBudget, long currentTick) {
+		if (!TRACE_SUMMARY_ENABLED) {
+			return;
+		}
+
 		if (tickBudget.summaryTick == Long.MIN_VALUE) {
 			tickBudget.summaryTick = currentTick;
 			return;
