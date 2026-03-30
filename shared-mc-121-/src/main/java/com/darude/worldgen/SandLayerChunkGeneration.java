@@ -112,6 +112,10 @@ public final class SandLayerChunkGeneration {
 			}
 
 		ChunkPos chunkPos = chunk.getPos();
+		if (NEAR_DESERT_DISABLED && !isChunkLikelySandstormBiomeFast(world, chunkPos)) {
+			return;
+		}
+
 		long seed = world.getSeed() ^ chunkPos.toLong();
 		Random random = Random.create(seed);
 		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
@@ -286,6 +290,13 @@ public final class SandLayerChunkGeneration {
 		}
 
 		return isChunkInNearDesertRegion(world, worldKey, chunkPos, nearDesertDistance, chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache);
+	}
+
+	private static boolean isChunkLikelySandstormBiomeFast(ServerWorld world, ChunkPos chunkPos) {
+		int centerX = chunkPos.getStartX() + 8;
+		int centerZ = chunkPos.getStartZ() + 8;
+		int sampleY = Math.max(world.getBottomY() + 1, world.getSeaLevel());
+		return world.getBiome(new BlockPos(centerX, sampleY, centerZ)).isIn(SANDSTORM_BIOMES);
 	}
 
 	private static boolean isChunkInNearDesertRegion(
