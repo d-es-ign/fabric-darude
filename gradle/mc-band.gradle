@@ -10,6 +10,8 @@ if (!project.ext.has('sharedModule')) {
 }
 
 def sharedProject = project(project.ext.sharedModule)
+def commonProject = project(':common')
+def commonMainJava = commonProject.file('src/main/java')
 def sharedMainJava = sharedProject.file('src/main/java')
 def sharedMainResources = sharedProject.file('src/main/resources')
 def sharedClientJava = sharedProject.file('src/client/java')
@@ -36,12 +38,9 @@ loom {
 }
 
 dependencies {
-    implementation project(':common')
-    include project(':common')
-
-    if (project.ext.has('noMappings') && project.ext.noMappings) {
-        minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
-        implementation "net.fabricmc:fabric-loader:${loaderVersion}"
+	if (project.ext.has('noMappings') && project.ext.noMappings) {
+		minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
+		implementation "net.fabricmc:fabric-loader:${loaderVersion}"
         implementation "net.fabricmc.fabric-api:fabric-api:${project.ext.fabricVersion}"
     } else if (project.ext.has('useOfficialMappings') && project.ext.useOfficialMappings) {
         minecraft "com.mojang:minecraft:${project.ext.minecraftVersion}"
@@ -63,12 +62,13 @@ dependencies {
 
 sourceSets {
     main {
-        java {
-            srcDirs = [
-                "${project.projectDir}/src/main/java",
-                sharedMainJava
-            ]
-        }
+		java {
+			srcDirs = [
+				"${project.projectDir}/src/main/java",
+				commonMainJava,
+				sharedMainJava
+			]
+		}
         resources {
             srcDirs = [
                 moduleMainResources,
