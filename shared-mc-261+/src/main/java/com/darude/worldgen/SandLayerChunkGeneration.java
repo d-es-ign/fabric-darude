@@ -245,8 +245,10 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Integer> topYNoLeavesCache,
 		Map<Long, Boolean> biomeInSandstormCache
 	) {
-		int regionX = chunkPos.x >> REGION_SHIFT;
-		int regionZ = chunkPos.z >> REGION_SHIFT;
+		int chunkX = chunkPos.getMinBlockX() >> 4;
+		int chunkZ = chunkPos.getMinBlockZ() >> 4;
+		int regionX = chunkX >> REGION_SHIFT;
+		int regionZ = chunkZ >> REGION_SHIFT;
 		long regionKey = columnKey(regionX, regionZ);
 
 		Map<Long, Boolean> worldRegionCache = NEAR_DESERT_REGION_CACHE.computeIfAbsent(worldKey, ignored -> new ConcurrentHashMap<>());
