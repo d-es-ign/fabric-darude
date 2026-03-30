@@ -33,6 +33,7 @@ public final class SandLayerChunkGeneration {
 	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
 	private static final int MAX_PLACEMENTS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_placements_per_chunk", 24);
 	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
+	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 2L) * 1_000_000L;
 	private static final boolean CHUNKGEN_DISABLED = Boolean.getBoolean("darude.chunkgen.disable");
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -106,9 +107,15 @@ public final class SandLayerChunkGeneration {
 		int placements = 0;
 		int nearDesertChecks = 0;
 		boolean placementBudgetExhausted = false;
+		boolean timeBudgetExhausted = false;
 
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
+				if (System.nanoTime() - startedAtNanos >= MAX_CHUNK_WORK_NANOS) {
+					timeBudgetExhausted = true;
+					break;
+				}
+
 				if (placements >= MAX_PLACEMENTS_PER_CHUNK) {
 					placementBudgetExhausted = true;
 					break;
@@ -202,9 +209,13 @@ public final class SandLayerChunkGeneration {
 				placements++;
 			}
 
-			if (placementBudgetExhausted) {
+			if (placementBudgetExhausted || timeBudgetExhausted) {
 				break;
 			}
+		}
+
+		if (timeBudgetExhausted && Boolean.getBoolean("darude.debug.hotspots")) {
+			DarudeMod.LOGGER.warn("Hotspot[chunk-generation-budget] world={} chunk={} exhausted {} ms budget", worldKey, chunkPos, MAX_CHUNK_WORK_NANOS / 1_000_000L);
 		}
 
 		DarudeDiagnostics.logChunkGeneration(
