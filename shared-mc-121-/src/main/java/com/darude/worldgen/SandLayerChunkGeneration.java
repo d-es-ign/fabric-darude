@@ -23,12 +23,15 @@ import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SandLayerChunkGeneration {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_DESERT_SUPPORT = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_desert_support"));
 	private static final TagKey<net.minecraft.block.Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
 	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
+	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
@@ -53,6 +56,10 @@ public final class SandLayerChunkGeneration {
 
 	private static void placeInGeneratedChunk(ServerWorld world, WorldChunk chunk) {
 		if (world.getTime() < STARTUP_SKIP_TICKS) {
+			String worldKey = world.getRegistryKey().getValue().toString();
+			if (STARTUP_SKIP_LOGGED_WORLDS.add(worldKey)) {
+				DarudeMod.LOGGER.info("Darude chunk generation startup skip active for world={} until tick {} (current tick={})", worldKey, STARTUP_SKIP_TICKS, world.getTime());
+			}
 			return;
 		}
 
