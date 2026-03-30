@@ -96,7 +96,7 @@ public final class SandLayerFarmingService {
 		}
 
 		DarudeDiagnostics.logFarmingTick(
-			world.dimension().getValue().toString(),
+			world.dimension().toString(),
 			scannedChunks.size(),
 			operationsUsed[0],
 			verticalChecksUsed[0],

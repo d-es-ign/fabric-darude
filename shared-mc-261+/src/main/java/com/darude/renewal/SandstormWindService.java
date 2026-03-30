@@ -54,7 +54,7 @@ public final class SandstormWindService {
 		Direction previous = state.direction;
 		state.direction = next;
 		state.nextShiftTick = time + WIND_SHIFT_TICKS;
-		DarudeDiagnostics.logWindShift(world.dimension().getValue().toString(), previous.toString(), next.toString(), time);
+		DarudeDiagnostics.logWindShift(world.dimension().toString(), previous.toString(), next.toString(), time);
 	}
 
 	private static final class WindState {
