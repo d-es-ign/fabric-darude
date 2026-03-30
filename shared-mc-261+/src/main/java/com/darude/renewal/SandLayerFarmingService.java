@@ -202,7 +202,7 @@ public final class SandLayerFarmingService {
 	}
 
 	private static boolean isChunkInSandstormBiome(ServerLevel world, ChunkPos chunkPos, Map<Long, Boolean> chunkBiomeCache) {
-		long key = chunkPos.toLong();
+		long key = ChunkPos.pack(chunkPos.x(), chunkPos.z());
 		Boolean cached = chunkBiomeCache.get(key);
 		if (cached != null) {
 			return cached;
