@@ -29,6 +29,7 @@ public final class SandLayerChunkGeneration {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<Block> SAND_LAYER_DESERT_SUPPORT = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_desert_support"));
 	private static final TagKey<Block> SAND_LAYER_NEAR_DESERT_SPAWNABLE_BLOCKS = TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sand_layer_near_desert_spawnable_blocks"));
+	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int[][][] CIRCLE_OFFSETS_EXCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
 	private static final int[][][] CIRCLE_OFFSETS_INCLUDE_ORIGIN = new int[MAX_OFFSET_RADIUS + 1][][];
@@ -52,6 +53,10 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static void placeInGeneratedChunk(ServerLevel world, LevelChunk chunk) {
+		if (world.getGameTime() < STARTUP_SKIP_TICKS) {
+			return;
+		}
+
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 		if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
 			return;
