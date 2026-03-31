@@ -12,6 +12,7 @@ import java.util.Map;
 
 public final class SandstormWindService {
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
+	private static final boolean WIND_DISABLED = Boolean.parseBoolean(System.getProperty("darude.wind.disable", "true"));
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 	private static final Map<String, WindState> STATES = new HashMap<>();
 	private static boolean registered;
@@ -20,6 +21,10 @@ public final class SandstormWindService {
 	}
 
 	public static synchronized void register() {
+		if (WIND_DISABLED) {
+			return;
+		}
+
 		if (registered) {
 			return;
 		}
