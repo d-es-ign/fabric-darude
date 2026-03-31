@@ -207,7 +207,21 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
 
-		if (!shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache)) {
+		boolean shouldProcess;
+		if (NEAR_DESERT_DISABLED) {
+			int centerX = chunkPos.getStartX() + 8;
+			int centerZ = chunkPos.getStartZ() + 8;
+			int centerY = getTopYSurfaceFromChunk(chunk, 8, 8);
+			if (centerY < world.getBottomY() || centerY > world.getTopYInclusive()) {
+				shouldProcess = false;
+			} else {
+				shouldProcess = isInSandstormBiome(world, new BlockPos(centerX, centerY, centerZ), biomeInSandstormCache);
+			}
+		} else {
+			shouldProcess = shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache);
+		}
+
+		if (!shouldProcess) {
 			tickBudget.skippedPrecheck++;
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-precheck] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
