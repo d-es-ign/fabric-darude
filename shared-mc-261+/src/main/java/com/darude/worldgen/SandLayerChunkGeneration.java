@@ -115,15 +115,16 @@ public final class SandLayerChunkGeneration {
 			if (packed == null) {
 				break;
 			}
-			queueState.enqueued.remove(packed);
 
 			int chunkX = unpackKeyX(packed);
 			int chunkZ = unpackKeyZ(packed);
 			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 			if (!(chunk instanceof LevelChunk levelChunk)) {
+				queueState.queue.addLast(packed);
 				continue;
 			}
 
+			queueState.enqueued.remove(packed);
 			processGeneratedChunk(world, levelChunk);
 			processedThisTick++;
 		}
