@@ -50,6 +50,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean TRACE_SUMMARY_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.summary");
 	private static final boolean TRACE_DESERT_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.trace_desert");
 	private static final boolean USE_FAST_BIOME_SKIP = Boolean.parseBoolean(System.getProperty("darude.chunkgen.use_fast_biome_skip", "false"));
+	private static final boolean PROCESS_DIRECT_ON_GENERATE = Boolean.parseBoolean(System.getProperty("darude.chunkgen.process_direct_on_generate", "true"));
 	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 2);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
@@ -82,10 +83,17 @@ public final class SandLayerChunkGeneration {
 
 	public static void register() {
 		ServerChunkEvents.CHUNK_GENERATE.register(SandLayerChunkGeneration::placeInGeneratedChunk);
-		ServerTickEvents.END_WORLD_TICK.register(SandLayerChunkGeneration::drainQueuedChunks);
+		if (!PROCESS_DIRECT_ON_GENERATE) {
+			ServerTickEvents.END_WORLD_TICK.register(SandLayerChunkGeneration::drainQueuedChunks);
+		}
 	}
 
 	private static void placeInGeneratedChunk(ServerWorld world, WorldChunk chunk) {
+		if (PROCESS_DIRECT_ON_GENERATE) {
+			processGeneratedChunk(world, chunk);
+			return;
+		}
+
 		enqueueGeneratedChunk(world, chunk.getPos());
 	}
 
