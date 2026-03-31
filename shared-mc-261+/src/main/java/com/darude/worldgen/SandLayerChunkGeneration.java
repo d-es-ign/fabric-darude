@@ -103,6 +103,7 @@ public final class SandLayerChunkGeneration {
 
 		String worldKey = world.dimension().toString();
 		QueueState queueState = QUEUES.computeIfAbsent(worldKey, ignored -> new QueueState());
+		int processedThisTick = 0;
 		for (int i = 0; i < MAX_QUEUED_CHUNKS_PER_TICK; i++) {
 			Long packed = queueState.queue.pollFirst();
 			if (packed == null) {
@@ -118,6 +119,11 @@ public final class SandLayerChunkGeneration {
 			}
 
 			processGeneratedChunk(world, chunk);
+			processedThisTick++;
+		}
+
+		if (processedThisTick > 0) {
+			DarudeMod.LOGGER.info("Trace[chunkgen-queue] world={} tick={} processedQueuedChunks={} remainingQueuedChunks={}", worldKey, world.getGameTime(), processedThisTick, queueState.queue.size());
 		}
 	}
 
