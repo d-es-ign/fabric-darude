@@ -37,6 +37,7 @@ public final class SandLayerChunkGeneration {
 	private static final long STARTUP_SKIP_TICKS = Long.getLong("darude.chunkgen.startup_skip_ticks", 200L);
 	private static final int MAX_PLACEMENTS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_placements_per_chunk", 8);
 	private static final int MAX_NEAR_DESERT_CHECKS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_near_desert_checks_per_chunk", 48);
+	private static final boolean USE_NEIGHBOR_LAYER_BIAS = Boolean.parseBoolean(System.getProperty("darude.chunkgen.use_neighbor_layer_bias", "false"));
 	private static final int MAX_COLUMNS_PER_CHUNK = Integer.getInteger("darude.chunkgen.max_columns_per_chunk", 16);
 	private static final long MAX_CHUNK_WORK_NANOS = Long.getLong("darude.chunkgen.max_chunk_work_ms", 1L) * 1_000_000L;
 	private static final long MAX_TICK_WORK_NANOS = Long.getLong("darude.chunkgen.max_tick_work_ms", 2L) * 1_000_000L;
@@ -278,11 +279,16 @@ public final class SandLayerChunkGeneration {
 					if (maximumLayers <= 1) {
 						layerCount = maximumLayers;
 					} else {
-						int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos, chunkAvailabilityCache);
-						int minimumLayers = surroundingFullBlocks / 2;
-
-						if (minimumLayers > maximumLayers) {
-							minimumLayers = maximumLayers;
+						int minimumLayers = 1;
+						if (USE_NEIGHBOR_LAYER_BIAS) {
+							int surroundingFullBlocks = countHorizontalFullBlocks(world, placementPos, chunkAvailabilityCache);
+							minimumLayers = surroundingFullBlocks / 2;
+							if (minimumLayers < 1) {
+								minimumLayers = 1;
+							}
+							if (minimumLayers > maximumLayers) {
+								minimumLayers = maximumLayers;
+							}
 						}
 
 						layerCount = random.nextInt(maximumLayers - minimumLayers + 1) + minimumLayers;
