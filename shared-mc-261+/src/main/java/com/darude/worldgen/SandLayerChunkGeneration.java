@@ -259,6 +259,14 @@ public final class SandLayerChunkGeneration {
 
 				BlockPos placementPos = new BlockPos(x, y, z);
 				if (!world.getBlockState(placementPos).isAir()) {
+					y += 1;
+					if (y > world.getMaxY()) {
+						continue;
+					}
+					placementPos = new BlockPos(x, y, z);
+				}
+
+				if (!world.getBlockState(placementPos).isAir()) {
 					continue;
 				}
 
