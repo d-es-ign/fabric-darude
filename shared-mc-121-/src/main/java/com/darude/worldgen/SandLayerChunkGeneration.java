@@ -114,12 +114,12 @@ public final class SandLayerChunkGeneration {
 
 			int chunkX = unpackKeyX(packed);
 			int chunkZ = unpackKeyZ(packed);
-			WorldChunk chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-			if (chunk == null) {
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof WorldChunk worldChunk)) {
 				continue;
 			}
 
-			processGeneratedChunk(world, chunk);
+			processGeneratedChunk(world, worldChunk);
 			processedThisTick++;
 		}
 

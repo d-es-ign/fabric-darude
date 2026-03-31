@@ -82,7 +82,11 @@ public final class SandLayerChunkGeneration {
 
 	public static void register() {
 		ServerChunkEvents.CHUNK_GENERATE.register(SandLayerChunkGeneration::placeInGeneratedChunk);
-		ServerTickEvents.END_WORLD_TICK.register(SandLayerChunkGeneration::drainQueuedChunks);
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			for (ServerLevel world : server.getAllLevels()) {
+				drainQueuedChunks(world);
+			}
+		});
 	}
 
 	private static void placeInGeneratedChunk(ServerLevel world, LevelChunk chunk) {
@@ -115,12 +119,12 @@ public final class SandLayerChunkGeneration {
 
 			int chunkX = unpackKeyX(packed);
 			int chunkZ = unpackKeyZ(packed);
-			LevelChunk chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-			if (chunk == null) {
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof LevelChunk levelChunk)) {
 				continue;
 			}
 
-			processGeneratedChunk(world, chunk);
+			processGeneratedChunk(world, levelChunk);
 			processedThisTick++;
 		}
 
