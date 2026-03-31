@@ -336,10 +336,10 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					setSandLayers(chunk, placementPos, layerCount);
-					placements++;
-					continue;
-				}
+				setSandLayers(world, placementPos, layerCount);
+				placements++;
+				continue;
+			}
 
 				if (!(world.canSeeSkyFromBelowWater(placementPos) || isUnderLeaves(world, placementPos))) {
 					continue;
@@ -381,7 +381,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				setSandLayers(chunk, placementPos, layerCount);
+				setSandLayers(world, placementPos, layerCount);
 				placements++;
 			
 			if (placementBudgetExhausted || timeBudgetExhausted) {
@@ -623,9 +623,9 @@ public final class SandLayerChunkGeneration {
 		return inBiome;
 	}
 
-	private static void setSandLayers(LevelChunk chunk, BlockPos pos, int layerCount) {
+	private static void setSandLayers(ServerLevel world, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
-		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers), 0);
+		world.setBlockAndUpdate(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers));
 	}
 
 	private static int countHorizontalFullBlocks(ServerLevel world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {

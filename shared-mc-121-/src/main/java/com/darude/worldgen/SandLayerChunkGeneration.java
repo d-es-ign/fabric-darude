@@ -331,7 +331,7 @@ public final class SandLayerChunkGeneration {
 						continue;
 					}
 
-					setSandLayers(chunk, placementPos, layerCount);
+					setSandLayers(world, placementPos, layerCount);
 					placements++;
 					continue;
 				}
@@ -376,7 +376,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				setSandLayers(chunk, placementPos, layerCount);
+				setSandLayers(world, placementPos, layerCount);
 				placements++;
 			
 			if (placementBudgetExhausted || timeBudgetExhausted) {
@@ -616,9 +616,9 @@ public final class SandLayerChunkGeneration {
 		return inBiome;
 	}
 
-	private static void setSandLayers(WorldChunk chunk, BlockPos pos, int layerCount) {
+	private static void setSandLayers(ServerWorld world, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
-		chunk.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), 0);
+		world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), net.minecraft.block.Block.NOTIFY_LISTENERS);
 	}
 
 	private static int countHorizontalFullBlocks(ServerWorld world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
