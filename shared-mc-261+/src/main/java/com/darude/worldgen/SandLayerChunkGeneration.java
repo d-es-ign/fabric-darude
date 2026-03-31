@@ -192,11 +192,11 @@ public final class SandLayerChunkGeneration {
 		long seed = world.getSeed() ^ chunkPos.pack();
 		RandomSource random = RandomSource.create(seed);
 		Map<Long, Boolean> chunkAvailabilityCache = new HashMap<>();
-		Map<Long, Integer> topYNoLeavesCache = new HashMap<>();
+		Map<Long, Integer> topYSurfaceCache = new HashMap<>();
 		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
 
-		if (!shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+		if (!shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache)) {
 			tickBudget.skippedPrecheck++;
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-precheck] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
@@ -243,7 +243,7 @@ public final class SandLayerChunkGeneration {
 				int x = chunkPos.getMinBlockX() + localX;
 				int z = chunkPos.getMinBlockZ() + localZ;
 				long phaseStartedAtNanos = System.nanoTime();
-				int y = getTopYNoLeaves(world, x, z, topYNoLeavesCache);
+				int y = getTopYSurfaceFromChunk(chunk, localX, localZ);
 				topYNanos += (System.nanoTime() - phaseStartedAtNanos);
 
 				if (y < world.getMinY() || y > world.getMaxY()) {
@@ -320,7 +320,7 @@ public final class SandLayerChunkGeneration {
 				nearDesertChecks++;
 
 				phaseStartedAtNanos = System.nanoTime();
-				boolean nearDesertSand = isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache, nearDesertSandCache);
+				boolean nearDesertSand = isNearDesertSand(world, placementPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache, nearDesertSandCache);
 				nearDesertProbeNanos += (System.nanoTime() - phaseStartedAtNanos);
 				nearDesertProbes++;
 				if (!nearDesertSand) {
@@ -371,7 +371,7 @@ public final class SandLayerChunkGeneration {
 				biomeCheckNanos / 1_000_000L,
 				nearDesertProbeNanos / 1_000_000L,
 				chunkAvailabilityCache.size(),
-				topYNoLeavesCache.size(),
+				topYSurfaceCache.size(),
 				biomeInSandstormCache.size(),
 				nearDesertSandCache.size(),
 				timeBudgetExhausted,
@@ -482,10 +482,10 @@ public final class SandLayerChunkGeneration {
 		ChunkPos chunkPos,
 		int nearDesertDistance,
 		Map<Long, Boolean> chunkAvailabilityCache,
-		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Integer> topYSurfaceCache,
 		Map<Long, Boolean> biomeInSandstormCache
 	) {
-		if (isChunkInSandstormBiome(world, worldKey, chunkPos, chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+		if (isChunkInSandstormBiome(world, worldKey, chunkPos, chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache)) {
 			return true;
 		}
 
@@ -493,7 +493,7 @@ public final class SandLayerChunkGeneration {
 			return false;
 		}
 
-		return isChunkInNearDesertRegion(world, worldKey, chunkPos, nearDesertDistance, chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache);
+		return isChunkInNearDesertRegion(world, worldKey, chunkPos, nearDesertDistance, chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache);
 	}
 
 	private static boolean isChunkLikelySandstormBiomeFast(ServerLevel world, ChunkPos chunkPos) {
@@ -509,7 +509,7 @@ public final class SandLayerChunkGeneration {
 		ChunkPos chunkPos,
 		int nearDesertDistance,
 		Map<Long, Boolean> chunkAvailabilityCache,
-		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Integer> topYSurfaceCache,
 		Map<Long, Boolean> biomeInSandstormCache
 	) {
 		int chunkX = chunkPos.getMinBlockX() >> 4;
@@ -533,7 +533,7 @@ public final class SandLayerChunkGeneration {
 		boolean nearDesert = false;
 		for (int cx = regionStartX - chunkRadius; cx <= regionEndX + chunkRadius && !nearDesert; cx++) {
 			for (int cz = regionStartZ - chunkRadius; cz <= regionEndZ + chunkRadius; cz++) {
-				if (isChunkInSandstormBiome(world, worldKey, new ChunkPos(cx, cz), chunkAvailabilityCache, topYNoLeavesCache, biomeInSandstormCache)) {
+				if (isChunkInSandstormBiome(world, worldKey, new ChunkPos(cx, cz), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache)) {
 					nearDesert = true;
 					break;
 				}
@@ -552,7 +552,7 @@ public final class SandLayerChunkGeneration {
 		String worldKey,
 		ChunkPos chunkPos,
 		Map<Long, Boolean> chunkAvailabilityCache,
-		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Integer> topYSurfaceCache,
 		Map<Long, Boolean> biomeInSandstormCache
 	) {
 		long key = chunkPos.pack();
@@ -567,7 +567,7 @@ public final class SandLayerChunkGeneration {
 		boolean available = isChunkAvailableForLookup(world, centerX, centerZ, chunkAvailabilityCache);
 		boolean inBiome = false;
 		if (available) {
-			int centerY = getTopYNoLeaves(world, centerX, centerZ, topYNoLeavesCache);
+			int centerY = getTopYSurface(world, centerX, centerZ, topYSurfaceCache);
 			if (centerY >= world.getMinY() && centerY <= world.getMaxY()) {
 				inBiome = isInSandstormBiome(world, new BlockPos(centerX, centerY, centerZ), biomeInSandstormCache);
 			}
@@ -637,7 +637,7 @@ public final class SandLayerChunkGeneration {
 		BlockPos pos,
 		int distance,
 		Map<Long, Boolean> chunkAvailabilityCache,
-		Map<Long, Integer> topYNoLeavesCache,
+		Map<Long, Integer> topYSurfaceCache,
 		Map<Long, Boolean> biomeInSandstormCache,
 		Map<Long, Boolean> nearDesertSandCache
 	) {
@@ -666,7 +666,7 @@ public final class SandLayerChunkGeneration {
 			return false;
 		}
 
-		if (hasNearbySandQuick(world, centerX, centerZ, quickSandDistance, mutablePos, chunkAvailabilityCache, topYNoLeavesCache)) {
+		if (hasNearbySandQuick(world, centerX, centerZ, quickSandDistance, mutablePos, chunkAvailabilityCache, topYSurfaceCache)) {
 			nearDesertSandCache.put(columnKey, true);
 			return true;
 		}
@@ -699,7 +699,7 @@ public final class SandLayerChunkGeneration {
 				continue;
 			}
 
-			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
+			int checkY = getTopYSurface(world, checkX, checkZ, topYSurfaceCache) - 1;
 			if (checkY < world.getMinY() || checkY > world.getMaxY()) {
 				continue;
 			}
@@ -748,7 +748,7 @@ public final class SandLayerChunkGeneration {
 		int distance,
 		BlockPos.MutableBlockPos mutablePos,
 		Map<Long, Boolean> chunkAvailabilityCache,
-		Map<Long, Integer> topYNoLeavesCache
+		Map<Long, Integer> topYSurfaceCache
 	) {
 		for (int[] direction : QUICK_CHECK_DIRECTIONS) {
 			int checkX = centerX + direction[0] * distance;
@@ -757,7 +757,7 @@ public final class SandLayerChunkGeneration {
 				continue;
 			}
 
-			int checkY = getTopYNoLeaves(world, checkX, checkZ, topYNoLeavesCache) - 1;
+			int checkY = getTopYSurface(world, checkX, checkZ, topYSurfaceCache) - 1;
 			if (checkY < world.getMinY() || checkY > world.getMaxY()) {
 				continue;
 			}
@@ -821,20 +821,24 @@ public final class SandLayerChunkGeneration {
 		return offsets;
 	}
 
-	private static int getTopYNoLeaves(ServerLevel world, int x, int z, Map<Long, Integer> topYNoLeavesCache) {
+	private static int getTopYSurface(ServerLevel world, int x, int z, Map<Long, Integer> topYSurfaceCache) {
 		long key = columnKey(x, z);
-		Integer cached = topYNoLeavesCache.get(key);
+		Integer cached = topYSurfaceCache.get(key);
 		if (cached != null) {
 			return cached;
 		}
 
-		int topY = world.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-		topYNoLeavesCache.put(key, topY);
+		int topY = world.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+		topYSurfaceCache.put(key, topY);
 		return topY;
 	}
 
+	private static int getTopYSurfaceFromChunk(LevelChunk chunk, int localX, int localZ) {
+		return chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX & 15, localZ & 15);
+	}
+
 	private static boolean isInSandstormBiome(ServerLevel world, BlockPos pos, Map<Long, Boolean> biomeInSandstormCache) {
-		long key = columnKey(pos.getX(), pos.getZ());
+		long key = columnKey(pos.getX() >> 2, pos.getZ() >> 2);
 		Boolean cached = biomeInSandstormCache.get(key);
 		if (cached != null) {
 			return cached;
