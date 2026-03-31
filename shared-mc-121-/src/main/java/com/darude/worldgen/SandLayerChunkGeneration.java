@@ -52,6 +52,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean USE_FAST_BIOME_SKIP = Boolean.parseBoolean(System.getProperty("darude.chunkgen.use_fast_biome_skip", "false"));
 	private static final boolean PROCESS_DIRECT_ON_GENERATE = Boolean.parseBoolean(System.getProperty("darude.chunkgen.process_direct_on_generate", "false"));
 	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 2);
+	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 8);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
@@ -69,6 +70,9 @@ public final class SandLayerChunkGeneration {
 	private static final int[][] QUICK_CHECK_DIRECTIONS = new int[][]{
 		{1, 0}, {-1, 0}, {0, 1}, {0, -1},
 		{1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+	};
+	private static final int[][] PRECHECK_SAMPLE_POINTS = new int[][]{
+		{8, 8}, {3, 3}, {12, 3}, {3, 12}, {12, 12}
 	};
 
 	static {
@@ -124,13 +128,24 @@ public final class SandLayerChunkGeneration {
 			int chunkZ = unpackKeyZ(packed);
 			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 			if (!(chunk instanceof WorldChunk worldChunk)) {
-				queueState.queue.addLast(packed);
+				int retries = queueState.unavailableRetries.getOrDefault(packed, 0) + 1;
+				if (retries <= MAX_UNAVAILABLE_RETRIES) {
+					queueState.unavailableRetries.put(packed, retries);
+					queueState.queue.addLast(packed);
+				} else {
+					queueState.unavailableRetries.remove(packed);
+					queueState.enqueued.remove(packed);
+				}
 				continue;
 			}
 
-			queueState.enqueued.remove(packed);
-			processGeneratedChunk(world, worldChunk);
-			processedThisTick++;
+			queueState.unavailableRetries.remove(packed);
+			if (processGeneratedChunk(world, worldChunk)) {
+				queueState.enqueued.remove(packed);
+				processedThisTick++;
+			} else {
+				queueState.queue.addLast(packed);
+			}
 		}
 
 		if (processedThisTick > 0) {
@@ -138,13 +153,13 @@ public final class SandLayerChunkGeneration {
 		}
 	}
 
-	private static void processGeneratedChunk(ServerWorld world, WorldChunk chunk) {
+	private static boolean processGeneratedChunk(ServerWorld world, WorldChunk chunk) {
 		if (CHUNKGEN_DISABLED) {
 			String worldKey = world.getRegistryKey().getValue().toString();
 			if (STARTUP_SKIP_LOGGED_WORLDS.add("disabled:" + worldKey)) {
 				DarudeMod.LOGGER.warn("Darude chunk generation disabled via -Ddarude.chunkgen.disable=true for world={}", worldKey);
 			}
-			return;
+			return true;
 		}
 
 		if (world.getTime() < STARTUP_SKIP_TICKS) {
@@ -152,7 +167,7 @@ public final class SandLayerChunkGeneration {
 			if (STARTUP_SKIP_LOGGED_WORLDS.add(worldKey)) {
 				DarudeMod.LOGGER.info("Darude chunk generation startup skip active for world={} until tick {} (current tick={})", worldKey, STARTUP_SKIP_TICKS, world.getTime());
 			}
-			return;
+			return false;
 		}
 
 		String worldKey = world.getRegistryKey().getValue().toString();
@@ -179,14 +194,14 @@ public final class SandLayerChunkGeneration {
 				tickBudget.loggedBudgetExhausted = true;
 				DarudeMod.LOGGER.warn("Hotspot[chunkgen-tick-budget] world={} tick={} usedMs={} maxMs={}", worldKey, currentTick, tickBudget.usedNanos / 1_000_000L, MAX_TICK_WORK_NANOS / 1_000_000L);
 			}
-			return;
+			return false;
 		}
 
 		long callbackStartedAtNanos = System.nanoTime();
 		try {
 			SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 			if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
-				return;
+				return true;
 			}
 
 		ChunkPos chunkPos = chunk.getPos();
@@ -197,7 +212,7 @@ public final class SandLayerChunkGeneration {
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-fast-biome] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
 			}
-			return;
+			return true;
 		}
 
 		long seed = world.getSeed() ^ chunkPos.toLong();
@@ -209,14 +224,7 @@ public final class SandLayerChunkGeneration {
 
 		boolean shouldProcess;
 		if (NEAR_DESERT_DISABLED) {
-			int centerX = chunkPos.getStartX() + 8;
-			int centerZ = chunkPos.getStartZ() + 8;
-			int centerY = getTopYSurfaceFromChunk(chunk, 8, 8);
-			if (centerY < world.getBottomY() || centerY > world.getTopYInclusive()) {
-				shouldProcess = false;
-			} else {
-				shouldProcess = isInSandstormBiome(world, new BlockPos(centerX, centerY, centerZ), biomeInSandstormCache);
-			}
+			shouldProcess = isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache);
 		} else {
 			shouldProcess = shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache);
 		}
@@ -226,7 +234,7 @@ public final class SandLayerChunkGeneration {
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-precheck] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
 			}
-			return;
+			return true;
 		}
  
 		long precheckNanos = System.nanoTime() - precheckStartedAtNanos;
@@ -448,6 +456,7 @@ public final class SandLayerChunkGeneration {
 		tickBudget.processedChunks++;
 		tickBudget.totalPlacements += placements;
 		tickBudget.totalChunkNanos += chunkElapsedNanos;
+		return true;
 		} finally {
 			tickBudget.usedNanos += Math.max(0L, System.nanoTime() - callbackStartedAtNanos);
 		}
@@ -512,6 +521,31 @@ public final class SandLayerChunkGeneration {
 	private static final class QueueState {
 		private final Deque<Long> queue = new ArrayDeque<>();
 		private final Set<Long> enqueued = new HashSet<>();
+		private final Map<Long, Integer> unavailableRetries = new HashMap<>();
+	}
+
+	private static boolean isChunkInSandstormBiomeCurrentChunk(
+		ServerWorld world,
+		WorldChunk chunk,
+		ChunkPos chunkPos,
+		Map<Long, Boolean> biomeInSandstormCache
+	) {
+		for (int[] samplePoint : PRECHECK_SAMPLE_POINTS) {
+			int localX = samplePoint[0];
+			int localZ = samplePoint[1];
+			int y = getTopYSurfaceFromChunk(chunk, localX, localZ);
+			if (y < world.getBottomY() || y > world.getTopYInclusive()) {
+				continue;
+			}
+
+			int x = chunkPos.getStartX() + localX;
+			int z = chunkPos.getStartZ() + localZ;
+			if (isInSandstormBiome(world, new BlockPos(x, y, z), biomeInSandstormCache)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private static boolean shouldProcessChunk(
@@ -609,10 +643,12 @@ public final class SandLayerChunkGeneration {
 			}
 		}
 
-		if (worldChunkBiomeCache.size() > MAX_CHUNK_BIOME_CACHE_ENTRIES) {
-			worldChunkBiomeCache.clear();
+		if (available) {
+			if (worldChunkBiomeCache.size() > MAX_CHUNK_BIOME_CACHE_ENTRIES) {
+				worldChunkBiomeCache.clear();
+			}
+			worldChunkBiomeCache.put(key, inBiome);
 		}
-		worldChunkBiomeCache.put(key, inBiome);
 		return inBiome;
 	}
 
