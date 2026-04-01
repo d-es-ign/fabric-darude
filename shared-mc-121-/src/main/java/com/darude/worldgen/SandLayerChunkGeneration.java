@@ -51,7 +51,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean TRACE_DESERT_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.trace_desert");
 	private static final boolean USE_FAST_BIOME_SKIP = Boolean.parseBoolean(System.getProperty("darude.chunkgen.use_fast_biome_skip", "false"));
 	private static final boolean STEP_TRACE_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.step_trace", "true"));
-	private static final boolean PROCESS_DIRECT_ON_GENERATE = Boolean.parseBoolean(System.getProperty("darude.chunkgen.process_direct_on_generate", "false"));
+	private static final boolean PROCESS_DIRECT_ON_GENERATE = Boolean.parseBoolean(System.getProperty("darude.chunkgen.process_direct_on_generate", "true"));
 	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 2);
 	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 8);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
