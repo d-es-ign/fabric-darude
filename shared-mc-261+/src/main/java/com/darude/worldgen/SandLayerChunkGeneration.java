@@ -57,6 +57,7 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 128);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
+	private static final boolean DEBUG_DESERT_GLASS_LAYER = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_glass_layer", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
@@ -286,6 +287,10 @@ public final class SandLayerChunkGeneration {
 
 		if (STEP_TRACE_ENABLED) {
 			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=precheck-pass fastBiome={} nearDesertDisabled={}", worldKey, chunkPosString, fastBiomeSandstorm, NEAR_DESERT_DISABLED);
+		}
+
+		if (DEBUG_DESERT_GLASS_LAYER && isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache)) {
+			placeDebugDesertGlassLayer(world, chunkPos);
 		}
 
 		long precheckNanos = System.nanoTime() - precheckStartedAtNanos;
@@ -728,6 +733,22 @@ public final class SandLayerChunkGeneration {
 	private static void setSandLayers(ServerLevel world, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
 		world.setBlockAndUpdate(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers));
+	}
+
+	private static void placeDebugDesertGlassLayer(ServerLevel world, ChunkPos chunkPos) {
+		int y = 128;
+		if (y < world.getMinY() || y > world.getMaxY()) {
+			return;
+		}
+
+		boolean oddChunkParity = ((chunkPos.x + chunkPos.z) & 1) != 0;
+		BlockState glassState = oddChunkParity ? Blocks.BLACK_STAINED_GLASS.defaultBlockState() : Blocks.YELLOW_STAINED_GLASS.defaultBlockState();
+		for (int localX = 0; localX < 16; localX++) {
+			for (int localZ = 0; localZ < 16; localZ++) {
+				BlockPos pos = new BlockPos(chunkPos.getMinBlockX() + localX, y, chunkPos.getMinBlockZ() + localZ);
+				world.setBlockAndUpdate(pos, glassState);
+			}
+		}
 	}
 
 	private static BlockPos findNearbyAirPlacementInChunk(ServerLevel world, LevelChunk chunk, ChunkPos chunkPos, int originLocalX, int originLocalZ) {
