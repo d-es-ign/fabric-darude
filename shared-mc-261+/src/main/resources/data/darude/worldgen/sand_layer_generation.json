@@ -1,5 +1,5 @@
 {
-  "valid_spot_chance": 0.3,
+  "valid_spot_chance": 0.8,
   "base_max_layers": 4,
   "near_desert_distance": 2,
   "near_desert_valid_spot_chance": 0.2,

@@ -201,7 +201,7 @@ public final class SandLayerGenerationConfig {
 		String nearDesertSpawnableSupportMode
 	) {
 		public static Values defaults() {
-			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 20, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 512, 3, 256, 6, 8, "full_block");
+			return new Values(0.8f, 4, 2, 0.2f, 0, 2, 20, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 512, 3, 256, 6, 8, "full_block");
 		}
 	}
 }
