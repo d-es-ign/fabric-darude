@@ -359,7 +359,24 @@ public final class SandLayerChunkGeneration {
 					BlockPos supportPos = placementPos.below();
 					BlockState supportState = world.getBlockState(supportPos);
 					if (!supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
-						continue;
+						BlockPos nearbyPlacementPos = findNearbyAirPlacementInChunk(world, chunk, chunkPos, localX, localZ);
+						if (nearbyPlacementPos == null) {
+							continue;
+						}
+
+						placementPos = nearbyPlacementPos;
+						if (!isInSandstormBiome(world, placementPos, biomeInSandstormCache)) {
+							continue;
+						}
+						if (USE_SKY_VISIBILITY_CHECK && !world.canSeeSkyFromBelowWater(placementPos)) {
+							continue;
+						}
+
+						supportPos = placementPos.below();
+						supportState = world.getBlockState(supportPos);
+						if (!supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
+							continue;
+						}
 					}
 
 					if (config.validSpotChance() <= 0.0f || random.nextFloat() >= config.validSpotChance()) {
@@ -711,6 +728,41 @@ public final class SandLayerChunkGeneration {
 	private static void setSandLayers(ServerLevel world, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
 		world.setBlockAndUpdate(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers));
+	}
+
+	private static BlockPos findNearbyAirPlacementInChunk(ServerLevel world, LevelChunk chunk, ChunkPos chunkPos, int originLocalX, int originLocalZ) {
+		for (int[] offset : QUICK_CHECK_DIRECTIONS) {
+			int localX = originLocalX + offset[0];
+			int localZ = originLocalZ + offset[1];
+			if (localX < 0 || localX > 15 || localZ < 0 || localZ > 15) {
+				continue;
+			}
+
+			int y = getTopYSurfaceFromChunk(chunk, localX, localZ);
+			if (y < world.getMinY() || y > world.getMaxY()) {
+				continue;
+			}
+
+			BlockPos candidate = new BlockPos(chunkPos.getMinBlockX() + localX, y, chunkPos.getMinBlockZ() + localZ);
+			if (!world.getBlockState(candidate).isAir()) {
+				y += 1;
+				if (y > world.getMaxY()) {
+					continue;
+				}
+				candidate = new BlockPos(chunkPos.getMinBlockX() + localX, y, chunkPos.getMinBlockZ() + localZ);
+			}
+
+			if (!world.getBlockState(candidate).isAir()) {
+				continue;
+			}
+
+			BlockState supportState = world.getBlockState(candidate.below());
+			if (supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
+				return candidate;
+			}
+		}
+
+		return null;
 	}
 
 	private static int countHorizontalFullBlocks(ServerLevel world, BlockPos center, Map<Long, Boolean> chunkAvailabilityCache) {
