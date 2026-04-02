@@ -59,6 +59,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final boolean DEBUG_DESERT_GLASS_LAYER = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_glass_layer", "true"));
 	private static final boolean DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_sample_support_markers", "true"));
+	private static final boolean DEBUG_DESERT_SUPPORT_STATE_LOG = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_support_state_log", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
@@ -372,6 +373,17 @@ public final class SandLayerChunkGeneration {
 						}
 
 						BlockState supportState = world.getBlockState(placementPos.below());
+						if (DEBUG_DESERT_SUPPORT_STATE_LOG) {
+							DarudeMod.LOGGER.info(
+								"Trace[chunkgen-support] world={} chunk={} pos={} supportState={} tagMatch={} sandLike={}",
+								worldKey,
+								chunkPosString,
+								placementPos,
+								supportState,
+								supportState.is(SAND_LAYER_DESERT_SUPPORT),
+								isSandLikeSupport(supportState)
+							);
+						}
 						BlockState markerState;
 						if (supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
 							markerState = Blocks.LIME_STAINED_GLASS.defaultBlockState();
