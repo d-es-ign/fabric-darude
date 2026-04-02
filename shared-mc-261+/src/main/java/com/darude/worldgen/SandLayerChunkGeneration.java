@@ -58,6 +58,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final boolean DEBUG_DESERT_GLASS_LAYER = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_glass_layer", "true"));
+	private static final boolean DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_sample_support_markers", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
@@ -354,7 +355,17 @@ public final class SandLayerChunkGeneration {
 				biomeCheckNanos += (System.nanoTime() - phaseStartedAtNanos);
 				biomeChecks++;
 				if (inSandstormBiome) {
-					if (USE_SKY_VISIBILITY_CHECK && !world.canSeeSkyFromBelowWater(placementPos)) {
+					if (!world.canSeeSkyFromBelowWater(placementPos)) {
+						continue;
+					}
+
+					if (DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS) {
+						BlockState supportState = world.getBlockState(placementPos.below());
+						BlockState markerState = supportState.is(SAND_LAYER_DESERT_SUPPORT)
+							? Blocks.LIME_STAINED_GLASS.defaultBlockState()
+							: Blocks.RED_STAINED_GLASS.defaultBlockState();
+						world.setBlockAndUpdate(placementPos, markerState);
+						placements++;
 						continue;
 					}
 
