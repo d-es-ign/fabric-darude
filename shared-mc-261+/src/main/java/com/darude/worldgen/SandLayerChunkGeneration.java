@@ -58,7 +58,6 @@ public final class SandLayerChunkGeneration {
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final boolean DEBUG_DESERT_GLASS_LAYER = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_glass_layer", "true"));
 	private static final boolean DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_sample_support_markers", "true"));
-	private static final boolean DEBUG_DESERT_SUPPORT_STATE_LOG = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_support_state_log", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
@@ -327,28 +326,13 @@ public final class SandLayerChunkGeneration {
 						}
 
 						BlockState supportState = world.getBlockState(placementPos.below());
-						boolean tagMatch = supportState.is(SAND_LAYER_DESERT_SUPPORT);
-						boolean sandLike = isSandLikeSupport(supportState);
-						if (DEBUG_DESERT_SUPPORT_STATE_LOG && sandLike && !tagMatch) {
-							DarudeMod.LOGGER.info(
-								"Trace[chunkgen-support-magenta] world={} chunk={} pos={} supportState={} tagMatch={} sandLike={}",
-								worldKey,
-								chunkPosString,
-								placementPos,
-								supportState,
-								tagMatch,
-								sandLike
-							);
-						}
 						BlockState markerState;
-						if (tagMatch) {
+						if (isSandLikeSupport(supportState)) {
 							markerState = Blocks.LIME_STAINED_GLASS.defaultBlockState();
-						} else if (supportState.canBeReplaced() && world.getBlockState(placementPos.below().below()).is(SAND_LAYER_DESERT_SUPPORT)) {
+						} else if (supportState.canBeReplaced() && isSandLikeSupport(world.getBlockState(placementPos.below().below()))) {
 							markerState = Blocks.YELLOW_STAINED_GLASS.defaultBlockState();
 						} else if (findNearbyAirPlacementInChunk(world, chunk, chunkPos, localX, localZ) != null) {
 							markerState = Blocks.BLUE_STAINED_GLASS.defaultBlockState();
-						} else if (sandLike) {
-							markerState = Blocks.MAGENTA_STAINED_GLASS.defaultBlockState();
 						} else {
 							continue;
 						}
@@ -367,7 +351,7 @@ public final class SandLayerChunkGeneration {
 
 					BlockPos supportPos = placementPos.below();
 					BlockState supportState = world.getBlockState(supportPos);
-					if (!supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
+					if (!isSandLikeSupport(supportState)) {
 						BlockPos nearbyPlacementPos = findNearbyAirPlacementInChunk(world, chunk, chunkPos, localX, localZ);
 						if (nearbyPlacementPos == null) {
 							continue;
@@ -383,7 +367,7 @@ public final class SandLayerChunkGeneration {
 
 						supportPos = placementPos.below();
 						supportState = world.getBlockState(supportPos);
-						if (!supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
+						if (!isSandLikeSupport(supportState)) {
 							continue;
 						}
 					}
@@ -743,6 +727,7 @@ public final class SandLayerChunkGeneration {
 		world.setBlockAndUpdate(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers));
 	}
 
+	// TODO: Reintroduce tag-based matching once runtime tag resolution is verified stable.
 	private static boolean isSandLikeSupport(BlockState state) {
 		return state.is(Blocks.SAND)
 			|| state.is(Blocks.RED_SAND)
