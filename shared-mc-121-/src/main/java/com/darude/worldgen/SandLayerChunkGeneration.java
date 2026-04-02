@@ -333,16 +333,19 @@ public final class SandLayerChunkGeneration {
 				}
 
 				BlockPos placementPos = new BlockPos(x, y, z);
+				boolean blockedColumn = false;
 				if (!world.isAir(placementPos)) {
 					y += 1;
 					if (y > world.getTopYInclusive()) {
-						continue;
+						blockedColumn = true;
+						y = world.getTopYInclusive();
+						placementPos = new BlockPos(x, y, z);
+					} else {
+						placementPos = new BlockPos(x, y, z);
+						if (!world.isAir(placementPos)) {
+							blockedColumn = true;
+						}
 					}
-					placementPos = new BlockPos(x, y, z);
-				}
-
-				if (!world.isAir(placementPos)) {
-					continue;
 				}
 
 				phaseStartedAtNanos = System.nanoTime();
@@ -350,17 +353,42 @@ public final class SandLayerChunkGeneration {
 				biomeCheckNanos += (System.nanoTime() - phaseStartedAtNanos);
 				biomeChecks++;
 				if (inSandstormBiome) {
-					if (!world.isSkyVisible(placementPos)) {
+					if (DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS) {
+						if (blockedColumn) {
+							world.setBlockState(placementPos, Blocks.ORANGE_STAINED_GLASS.getDefaultState(), net.minecraft.block.Block.NOTIFY_LISTENERS);
+							placements++;
+							continue;
+						}
+
+						if (!world.isSkyVisible(placementPos)) {
+							world.setBlockState(placementPos, Blocks.CYAN_STAINED_GLASS.getDefaultState(), net.minecraft.block.Block.NOTIFY_LISTENERS);
+							placements++;
+							continue;
+						}
+
+						BlockState supportState = world.getBlockState(placementPos.down());
+						BlockState markerState;
+						if (supportState.isIn(SAND_LAYER_DESERT_SUPPORT)) {
+							markerState = Blocks.LIME_STAINED_GLASS.getDefaultState();
+						} else if (supportState.isReplaceable() && world.getBlockState(placementPos.down().down()).isIn(SAND_LAYER_DESERT_SUPPORT)) {
+							markerState = Blocks.YELLOW_STAINED_GLASS.getDefaultState();
+						} else if (findNearbyAirPlacementInChunk(world, chunk, chunkPos, localX, localZ) != null) {
+							markerState = Blocks.BLUE_STAINED_GLASS.getDefaultState();
+						} else if (isSandLikeSupport(supportState)) {
+							markerState = Blocks.MAGENTA_STAINED_GLASS.getDefaultState();
+						} else {
+							markerState = Blocks.RED_STAINED_GLASS.getDefaultState();
+						}
+						world.setBlockState(placementPos, markerState, net.minecraft.block.Block.NOTIFY_LISTENERS);
+						placements++;
 						continue;
 					}
 
-					if (DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS) {
-						BlockState supportState = world.getBlockState(placementPos.down());
-						BlockState markerState = supportState.isIn(SAND_LAYER_DESERT_SUPPORT)
-							? Blocks.LIME_STAINED_GLASS.getDefaultState()
-							: Blocks.RED_STAINED_GLASS.getDefaultState();
-						world.setBlockState(placementPos, markerState, net.minecraft.block.Block.NOTIFY_LISTENERS);
-						placements++;
+					if (blockedColumn) {
+						continue;
+					}
+
+					if (USE_SKY_VISIBILITY_CHECK && !world.isSkyVisible(placementPos)) {
 						continue;
 					}
 
@@ -417,6 +445,10 @@ public final class SandLayerChunkGeneration {
 
 					setSandLayers(world, placementPos, layerCount);
 					placements++;
+					continue;
+				}
+
+				if (blockedColumn) {
 					continue;
 				}
 
@@ -737,6 +769,20 @@ public final class SandLayerChunkGeneration {
 	private static void setSandLayers(ServerWorld world, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
 		world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), net.minecraft.block.Block.NOTIFY_LISTENERS);
+	}
+
+	private static boolean isSandLikeSupport(BlockState state) {
+		return state.isOf(Blocks.SAND)
+			|| state.isOf(Blocks.RED_SAND)
+			|| state.isOf(Blocks.SANDSTONE)
+			|| state.isOf(Blocks.CUT_SANDSTONE)
+			|| state.isOf(Blocks.CHISELED_SANDSTONE)
+			|| state.isOf(Blocks.SMOOTH_SANDSTONE)
+			|| state.isOf(Blocks.RED_SANDSTONE)
+			|| state.isOf(Blocks.CUT_RED_SANDSTONE)
+			|| state.isOf(Blocks.CHISELED_RED_SANDSTONE)
+			|| state.isOf(Blocks.SMOOTH_RED_SANDSTONE)
+			|| state.isOf(Blocks.SUSPICIOUS_SAND);
 	}
 
 	private static void placeDebugDesertGlassLayer(ServerWorld world, ChunkPos chunkPos) {

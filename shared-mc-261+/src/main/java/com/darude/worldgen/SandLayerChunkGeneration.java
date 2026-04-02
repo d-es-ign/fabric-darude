@@ -338,16 +338,19 @@ public final class SandLayerChunkGeneration {
 				}
 
 				BlockPos placementPos = new BlockPos(x, y, z);
+				boolean blockedColumn = false;
 				if (!world.getBlockState(placementPos).isAir()) {
 					y += 1;
 					if (y > world.getMaxY()) {
-						continue;
+						blockedColumn = true;
+						y = world.getMaxY();
+						placementPos = new BlockPos(x, y, z);
+					} else {
+						placementPos = new BlockPos(x, y, z);
+						if (!world.getBlockState(placementPos).isAir()) {
+							blockedColumn = true;
+						}
 					}
-					placementPos = new BlockPos(x, y, z);
-				}
-
-				if (!world.getBlockState(placementPos).isAir()) {
-					continue;
 				}
 
 				phaseStartedAtNanos = System.nanoTime();
@@ -355,17 +358,42 @@ public final class SandLayerChunkGeneration {
 				biomeCheckNanos += (System.nanoTime() - phaseStartedAtNanos);
 				biomeChecks++;
 				if (inSandstormBiome) {
-					if (!world.canSeeSkyFromBelowWater(placementPos)) {
+					if (DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS) {
+						if (blockedColumn) {
+							world.setBlockAndUpdate(placementPos, Blocks.ORANGE_STAINED_GLASS.defaultBlockState());
+							placements++;
+							continue;
+						}
+
+						if (!world.canSeeSkyFromBelowWater(placementPos)) {
+							world.setBlockAndUpdate(placementPos, Blocks.CYAN_STAINED_GLASS.defaultBlockState());
+							placements++;
+							continue;
+						}
+
+						BlockState supportState = world.getBlockState(placementPos.below());
+						BlockState markerState;
+						if (supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
+							markerState = Blocks.LIME_STAINED_GLASS.defaultBlockState();
+						} else if (supportState.canBeReplaced() && world.getBlockState(placementPos.below().below()).is(SAND_LAYER_DESERT_SUPPORT)) {
+							markerState = Blocks.YELLOW_STAINED_GLASS.defaultBlockState();
+						} else if (findNearbyAirPlacementInChunk(world, chunk, chunkPos, localX, localZ) != null) {
+							markerState = Blocks.BLUE_STAINED_GLASS.defaultBlockState();
+						} else if (isSandLikeSupport(supportState)) {
+							markerState = Blocks.MAGENTA_STAINED_GLASS.defaultBlockState();
+						} else {
+							markerState = Blocks.RED_STAINED_GLASS.defaultBlockState();
+						}
+						world.setBlockAndUpdate(placementPos, markerState);
+						placements++;
 						continue;
 					}
 
-					if (DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS) {
-						BlockState supportState = world.getBlockState(placementPos.below());
-						BlockState markerState = supportState.is(SAND_LAYER_DESERT_SUPPORT)
-							? Blocks.LIME_STAINED_GLASS.defaultBlockState()
-							: Blocks.RED_STAINED_GLASS.defaultBlockState();
-						world.setBlockAndUpdate(placementPos, markerState);
-						placements++;
+					if (blockedColumn) {
+						continue;
+					}
+
+					if (USE_SKY_VISIBILITY_CHECK && !world.canSeeSkyFromBelowWater(placementPos)) {
 						continue;
 					}
 
@@ -424,6 +452,10 @@ public final class SandLayerChunkGeneration {
 				placements++;
 				continue;
 			}
+
+				if (blockedColumn) {
+					continue;
+				}
 
 				if (!(world.canSeeSkyFromBelowWater(placementPos) || isUnderLeaves(world, placementPos))) {
 					continue;
@@ -744,6 +776,20 @@ public final class SandLayerChunkGeneration {
 	private static void setSandLayers(ServerLevel world, BlockPos pos, int layerCount) {
 		int clampedLayers = Math.max(1, Math.min(15, layerCount));
 		world.setBlockAndUpdate(pos, DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, clampedLayers));
+	}
+
+	private static boolean isSandLikeSupport(BlockState state) {
+		return state.is(Blocks.SAND)
+			|| state.is(Blocks.RED_SAND)
+			|| state.is(Blocks.SANDSTONE)
+			|| state.is(Blocks.CUT_SANDSTONE)
+			|| state.is(Blocks.CHISELED_SANDSTONE)
+			|| state.is(Blocks.SMOOTH_SANDSTONE)
+			|| state.is(Blocks.RED_SANDSTONE)
+			|| state.is(Blocks.CUT_RED_SANDSTONE)
+			|| state.is(Blocks.CHISELED_RED_SANDSTONE)
+			|| state.is(Blocks.SMOOTH_RED_SANDSTONE)
+			|| state.is(Blocks.SUSPICIOUS_SAND);
 	}
 
 	private static void placeDebugDesertGlassLayer(ServerLevel world, ChunkPos chunkPos) {
