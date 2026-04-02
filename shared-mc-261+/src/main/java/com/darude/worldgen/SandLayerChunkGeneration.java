@@ -382,7 +382,7 @@ public final class SandLayerChunkGeneration {
 						} else if (isSandLikeSupport(supportState)) {
 							markerState = Blocks.MAGENTA_STAINED_GLASS.defaultBlockState();
 						} else {
-							markerState = Blocks.RED_STAINED_GLASS.defaultBlockState();
+							continue;
 						}
 						world.setBlockAndUpdate(placementPos, markerState);
 						placements++;
