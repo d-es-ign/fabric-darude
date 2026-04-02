@@ -56,8 +56,6 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 128);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
-	private static final boolean DEBUG_DESERT_GLASS_LAYER = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_glass_layer", "true"));
-	private static final boolean DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.desert_sample_support_markers", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final int MAX_OFFSET_RADIUS = 8;
@@ -312,35 +310,6 @@ public final class SandLayerChunkGeneration {
 				biomeCheckNanos += (System.nanoTime() - phaseStartedAtNanos);
 				biomeChecks++;
 				if (inSandstormBiome) {
-					if (DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS) {
-						if (blockedColumn) {
-							world.setBlockAndUpdate(placementPos, Blocks.ORANGE_STAINED_GLASS.defaultBlockState());
-							placements++;
-							continue;
-						}
-
-						if (!world.canSeeSkyFromBelowWater(placementPos)) {
-							world.setBlockAndUpdate(placementPos, Blocks.CYAN_STAINED_GLASS.defaultBlockState());
-							placements++;
-							continue;
-						}
-
-						BlockState supportState = world.getBlockState(placementPos.below());
-						BlockState markerState;
-						if (isSandLikeSupport(supportState)) {
-							markerState = Blocks.LIME_STAINED_GLASS.defaultBlockState();
-						} else if (supportState.canBeReplaced() && isSandLikeSupport(world.getBlockState(placementPos.below().below()))) {
-							markerState = Blocks.YELLOW_STAINED_GLASS.defaultBlockState();
-						} else if (findNearbyAirPlacementInChunk(world, chunk, chunkPos, localX, localZ) != null) {
-							markerState = Blocks.BLUE_STAINED_GLASS.defaultBlockState();
-						} else {
-							continue;
-						}
-						world.setBlockAndUpdate(placementPos, markerState);
-						placements++;
-						continue;
-					}
-
 					if (blockedColumn) {
 						continue;
 					}
@@ -521,9 +490,6 @@ public final class SandLayerChunkGeneration {
 		tickBudget.processedChunks++;
 		tickBudget.totalPlacements += placements;
 		tickBudget.totalChunkNanos += chunkElapsedNanos;
-		if (DEBUG_DESERT_GLASS_LAYER && !DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS && isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache)) {
-			placeDebugDesertGlassLayer(world, chunkPos);
-		}
 		return true;
 		} finally {
 			tickBudget.usedNanos += Math.max(0L, System.nanoTime() - callbackStartedAtNanos);
@@ -740,22 +706,6 @@ public final class SandLayerChunkGeneration {
 			|| state.is(Blocks.CHISELED_RED_SANDSTONE)
 			|| state.is(Blocks.SMOOTH_RED_SANDSTONE)
 			|| state.is(Blocks.SUSPICIOUS_SAND);
-	}
-
-	private static void placeDebugDesertGlassLayer(ServerLevel world, ChunkPos chunkPos) {
-		int y = 128;
-		if (y < world.getMinY() || y > world.getMaxY()) {
-			return;
-		}
-
-		boolean oddChunkParity = ((chunkPos.x() + chunkPos.z()) & 1) != 0;
-		BlockState glassState = oddChunkParity ? Blocks.BLACK_STAINED_GLASS.defaultBlockState() : Blocks.YELLOW_STAINED_GLASS.defaultBlockState();
-		for (int localX = 0; localX < 16; localX++) {
-			for (int localZ = 0; localZ < 16; localZ++) {
-				BlockPos pos = new BlockPos(chunkPos.getMinBlockX() + localX, y, chunkPos.getMinBlockZ() + localZ);
-				world.setBlockAndUpdate(pos, glassState);
-			}
-		}
 	}
 
 	private static BlockPos findNearbyAirPlacementInChunk(ServerLevel world, LevelChunk chunk, ChunkPos chunkPos, int originLocalX, int originLocalZ) {
