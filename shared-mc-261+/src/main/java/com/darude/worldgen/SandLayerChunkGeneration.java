@@ -741,7 +741,7 @@ public final class SandLayerChunkGeneration {
 			return;
 		}
 
-		boolean oddChunkParity = ((chunkPos.x + chunkPos.z) & 1) != 0;
+		boolean oddChunkParity = ((chunkPos.x() + chunkPos.z()) & 1) != 0;
 		BlockState glassState = oddChunkParity ? Blocks.BLACK_STAINED_GLASS.defaultBlockState() : Blocks.YELLOW_STAINED_GLASS.defaultBlockState();
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
