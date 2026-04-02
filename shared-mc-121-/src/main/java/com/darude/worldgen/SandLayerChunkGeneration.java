@@ -50,7 +50,6 @@ public final class SandLayerChunkGeneration {
 	private static final boolean TRACE_SUMMARY_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.summary");
 	private static final boolean TRACE_DESERT_ENABLED = Boolean.getBoolean("darude.debug.chunkgen.trace_desert");
 	private static final boolean USE_FAST_BIOME_SKIP = Boolean.parseBoolean(System.getProperty("darude.chunkgen.use_fast_biome_skip", "false"));
-	private static final boolean STEP_TRACE_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.chunkgen.step_trace", "true"));
 	private static final boolean PROCESS_DIRECT_ON_GENERATE = Boolean.parseBoolean(System.getProperty("darude.chunkgen.process_direct_on_generate", "false"));
 	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 16);
 	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 128);
@@ -111,11 +110,6 @@ public final class SandLayerChunkGeneration {
 		long packed = columnKey(chunkPos.x, chunkPos.z);
 		if (queueState.enqueued.add(packed)) {
 			queueState.queue.addLast(packed);
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=enqueue queueSize={}", worldKey, chunkPos, queueState.queue.size());
-			}
-		} else if (STEP_TRACE_ENABLED) {
-			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=enqueue-skip-duplicate queueSize={}", worldKey, chunkPos, queueState.queue.size());
 		}
 	}
 
@@ -135,24 +129,15 @@ public final class SandLayerChunkGeneration {
 
 			int chunkX = unpackKeyX(packed);
 			int chunkZ = unpackKeyZ(packed);
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk=ChunkPos{{{}, {}}} step=dequeue queueSizeAfterPoll={}", worldKey, chunkX, chunkZ, queueState.queue.size());
-			}
 			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
 			if (!(chunk instanceof WorldChunk worldChunk)) {
 				int retries = queueState.unavailableRetries.getOrDefault(packed, 0) + 1;
 				if (retries <= MAX_UNAVAILABLE_RETRIES) {
 					queueState.unavailableRetries.put(packed, retries);
 					queueState.queue.addLast(packed);
-					if (STEP_TRACE_ENABLED) {
-						DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk=ChunkPos{{{}, {}}} step=chunk-unavailable action=requeue retry={} queueSize={}", worldKey, chunkX, chunkZ, retries, queueState.queue.size());
-					}
 				} else {
 					queueState.unavailableRetries.remove(packed);
 					queueState.enqueued.remove(packed);
-					if (STEP_TRACE_ENABLED) {
-						DarudeMod.LOGGER.warn("Trace[chunkgen-step] world={} chunk=ChunkPos{{{}, {}}} step=chunk-unavailable action=drop retryLimit={} queueSize={}", worldKey, chunkX, chunkZ, MAX_UNAVAILABLE_RETRIES, queueState.queue.size());
-					}
 				}
 				continue;
 			}
@@ -161,14 +146,8 @@ public final class SandLayerChunkGeneration {
 			if (processGeneratedChunk(world, worldChunk)) {
 				queueState.enqueued.remove(packed);
 				processedThisTick++;
-				if (STEP_TRACE_ENABLED) {
-					DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-done action=dequeue-complete", worldKey, worldChunk.getPos());
-				}
 			} else {
 				queueState.queue.addLast(packed);
-				if (STEP_TRACE_ENABLED) {
-					DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-deferred action=requeue queueSize={}", worldKey, worldChunk.getPos(), queueState.queue.size());
-				}
 			}
 		}
 
@@ -180,16 +159,10 @@ public final class SandLayerChunkGeneration {
 	private static boolean processGeneratedChunk(ServerWorld world, WorldChunk chunk) {
 		String chunkPosString = chunk.getPos().toString();
 		String worldKey = world.getRegistryKey().getValue().toString();
-		if (STEP_TRACE_ENABLED) {
-			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-start", worldKey, chunkPosString);
-		}
 
 		if (CHUNKGEN_DISABLED) {
 			if (STARTUP_SKIP_LOGGED_WORLDS.add("disabled:" + worldKey)) {
 				DarudeMod.LOGGER.warn("Darude chunk generation disabled via -Ddarude.chunkgen.disable=true for world={}", worldKey);
-			}
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-skip reason=chunkgen-disabled", worldKey, chunkPosString);
 			}
 			return true;
 		}
@@ -197,9 +170,6 @@ public final class SandLayerChunkGeneration {
 		if (world.getTime() < STARTUP_SKIP_TICKS) {
 			if (STARTUP_SKIP_LOGGED_WORLDS.add(worldKey)) {
 				DarudeMod.LOGGER.info("Darude chunk generation startup skip active for world={} until tick {} (current tick={})", worldKey, STARTUP_SKIP_TICKS, world.getTime());
-			}
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-defer reason=startup-skip currentTick={} startupSkipTicks={}", worldKey, chunkPosString, world.getTime(), STARTUP_SKIP_TICKS);
 			}
 			return false;
 		}
@@ -227,9 +197,6 @@ public final class SandLayerChunkGeneration {
 				tickBudget.loggedBudgetExhausted = true;
 				DarudeMod.LOGGER.warn("Hotspot[chunkgen-tick-budget] world={} tick={} usedMs={} maxMs={}", worldKey, currentTick, tickBudget.usedNanos / 1_000_000L, MAX_TICK_WORK_NANOS / 1_000_000L);
 			}
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-defer reason=tick-budget-exhausted usedMs={} maxMs={}", worldKey, chunkPosString, tickBudget.usedNanos / 1_000_000L, MAX_TICK_WORK_NANOS / 1_000_000L);
-			}
 			return false;
 		}
 
@@ -237,9 +204,6 @@ public final class SandLayerChunkGeneration {
 		try {
 			SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
 			if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
-				if (STEP_TRACE_ENABLED) {
-					DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-skip reason=config-zero-layers", worldKey, chunkPosString);
-				}
 				return true;
 			}
 
@@ -250,9 +214,6 @@ public final class SandLayerChunkGeneration {
 			tickBudget.skippedFastBiome++;
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-fast-biome] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
-			}
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=precheck-skip reason=fast-biome-skip", worldKey, chunkPosString);
 			}
 			return true;
 		}
@@ -276,14 +237,7 @@ public final class SandLayerChunkGeneration {
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-precheck] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
 			}
-			if (STEP_TRACE_ENABLED) {
-				DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=precheck-skip reason=should-process-false", worldKey, chunkPosString);
-			}
 			return true;
-		}
-
-		if (STEP_TRACE_ENABLED) {
-			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=precheck-pass fastBiome={} nearDesertDisabled={}", worldKey, chunkPosString, fastBiomeSandstorm, NEAR_DESERT_DISABLED);
 		}
 
 		 
@@ -578,9 +532,6 @@ public final class SandLayerChunkGeneration {
 		tickBudget.processedChunks++;
 		tickBudget.totalPlacements += placements;
 		tickBudget.totalChunkNanos += chunkElapsedNanos;
-		if (STEP_TRACE_ENABLED) {
-			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-finish placements={} colsEvaluated={} colsMax={} chunkMs={} chunkBudgetHit={} tickUsedMs={}", worldKey, chunkPosString, placements, evaluatedColumns, columnsToEvaluate, chunkElapsedNanos / 1_000_000L, timeBudgetExhausted, tickBudget.usedNanos / 1_000_000L);
-		}
 		if (DEBUG_DESERT_GLASS_LAYER && !DEBUG_DESERT_SAMPLE_SUPPORT_MARKERS && isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache)) {
 			placeDebugDesertGlassLayer(world, chunkPos);
 		}
