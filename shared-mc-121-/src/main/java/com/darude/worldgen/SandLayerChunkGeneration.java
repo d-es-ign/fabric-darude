@@ -284,10 +284,7 @@ public final class SandLayerChunkGeneration {
 			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=precheck-pass fastBiome={} nearDesertDisabled={}", worldKey, chunkPosString, fastBiomeSandstorm, NEAR_DESERT_DISABLED);
 		}
 
-		if (DEBUG_DESERT_GLASS_LAYER && isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache)) {
-			placeDebugDesertGlassLayer(world, chunkPos);
-		}
- 
+		 
 		long precheckNanos = System.nanoTime() - precheckStartedAtNanos;
 
 		long startedAtNanos = System.nanoTime();
@@ -526,6 +523,9 @@ public final class SandLayerChunkGeneration {
 		tickBudget.totalChunkNanos += chunkElapsedNanos;
 		if (STEP_TRACE_ENABLED) {
 			DarudeMod.LOGGER.info("Trace[chunkgen-step] world={} chunk={} step=process-finish placements={} colsEvaluated={} colsMax={} chunkMs={} chunkBudgetHit={} tickUsedMs={}", worldKey, chunkPosString, placements, evaluatedColumns, columnsToEvaluate, chunkElapsedNanos / 1_000_000L, timeBudgetExhausted, tickBudget.usedNanos / 1_000_000L);
+		}
+		if (DEBUG_DESERT_GLASS_LAYER && isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache)) {
+			placeDebugDesertGlassLayer(world, chunkPos);
 		}
 		return true;
 		} finally {
