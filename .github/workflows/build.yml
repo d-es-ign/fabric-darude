@@ -88,38 +88,8 @@ jobs:
           fi
       - name: build ${{ matrix.module }}
         run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} build
-      - name: capture ${{ matrix.module }} artifacts
-        if: ${{ success() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: Artifacts-${{ matrix.module }}
-          path: ${{ matrix.module_path }}/build/libs/
-
-  release-jars:
-    runs-on: ubuntu-24.04
-    needs: [common, discover-modules]
-    if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
-    continue-on-error: false
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.discover-modules.outputs.matrix) }}
-    steps:
-      - name: checkout repository
-        uses: actions/checkout@v6
-      - name: validate gradle wrapper
-        uses: gradle/actions/wrapper-validation@v5
-      - name: setup jdk
-        uses: actions/setup-java@v5
-        with:
-          java-version: '25'
-          distribution: 'temurin'
-      - name: make gradle wrapper executable
-        run: chmod +x ./gradlew
-      - name: build ${{ matrix.module }}
-        run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} build
       - name: locate release jar for ${{ matrix.module }}
-        id: jar
+        id: release_jar
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           from pathlib import Path
@@ -139,7 +109,14 @@ jobs:
           print(f'path={chosen.as_posix()}')
           PY
       - name: upload release jar for ${{ matrix.module }}
+        if: ${{ success() }}
         uses: actions/upload-artifact@v7
         with:
-          name: release-jars-${{ matrix.module }}
-          path: ${{ steps.jar.outputs.path }}
+          name: release-jar-${{ matrix.module }}
+          path: ${{ steps.release_jar.outputs.path }}
+      - name: capture ${{ matrix.module }} artifacts
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-libs-${{ matrix.module }}
+          path: ${{ matrix.module_path }}/build/libs/
