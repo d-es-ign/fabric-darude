@@ -97,7 +97,13 @@ jobs:
 
   release-jars:
     runs-on: ubuntu-24.04
-    needs: common
+    needs: [common, discover-modules]
+    if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.discover-modules.outputs.matrix) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -108,12 +114,32 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
-      - name: make scripts executable
-        run: chmod +x ./gradlew ./scripts/build-release-jars.sh
-      - name: build release jars
-        run: ./scripts/build-release-jars.sh --clean
-      - name: upload release jars
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: build ${{ matrix.module }}
+        run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} build
+      - name: locate release jar for ${{ matrix.module }}
+        id: jar
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          from pathlib import Path
+          import sys
+
+          module_path = Path('${{ matrix.module_path }}')
+          libs = module_path / 'build' / 'libs'
+          jars = sorted(
+              p for p in libs.glob('*.jar')
+              if '-sources' not in p.name and '-dev' not in p.name and '-javadoc' not in p.name
+          )
+          if not jars:
+              print(f'No publishable jar found in {libs}', file=sys.stderr)
+              sys.exit(1)
+
+          chosen = jars[-1]
+          print(f'path={chosen.as_posix()}')
+          PY
+      - name: upload release jar for ${{ matrix.module }}
         uses: actions/upload-artifact@v7
         with:
-          name: release-jars
-          path: releases/*.jar
+          name: release-jars-${{ matrix.module }}
+          path: ${{ steps.jar.outputs.path }}
