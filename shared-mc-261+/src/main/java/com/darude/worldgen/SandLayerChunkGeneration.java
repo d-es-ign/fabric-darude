@@ -154,7 +154,7 @@ public final class SandLayerChunkGeneration {
 		}
 
 		if (processedThisTick > 0) {
-			DarudeMod.LOGGER.info("Trace[chunkgen-queue] world={} tick={} processedQueuedChunks={} remainingQueuedChunks={}", worldKey, world.getGameTime(), processedThisTick, queueState.queue.size());
+			DarudeMod.LOGGER.debug("Trace[chunkgen-queue] world={} tick={} processedQueuedChunks={} remainingQueuedChunks={}", worldKey, world.getGameTime(), processedThisTick, queueState.queue.size());
 		}
 	}
 
@@ -735,7 +735,7 @@ public final class SandLayerChunkGeneration {
 			}
 
 			BlockState supportState = world.getBlockState(candidate.below());
-			if (supportState.is(SAND_LAYER_DESERT_SUPPORT)) {
+			if (isSandLikeSupport(supportState)) {
 				return candidate;
 			}
 		}
