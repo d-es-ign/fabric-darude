@@ -14,6 +14,14 @@ java {
 dependencies {
 }
 
+processResources {
+	inputs.property('version', project.version)
+
+	filesMatching('fabric.mod.json') {
+		expand('version': inputs.properties.version)
+	}
+}
+
 sourceSets {
 	main {
 		java {

@@ -1,0 +1,9 @@
+{
+	"schemaVersion": 1,
+	"id": "darude_common",
+	"version": "${version}",
+	"name": "Darude Common",
+	"description": "Common shared library for Darude version bands",
+	"license": "CC0-1.0",
+	"environment": "*"
+}

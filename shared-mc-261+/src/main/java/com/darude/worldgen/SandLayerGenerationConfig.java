@@ -1,6 +1,7 @@
 package com.darude.worldgen;
 
 import com.darude.DarudeMod;
+import com.darude.DarudeDiagnostics;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -136,7 +137,7 @@ public final class SandLayerGenerationConfig {
 						nearDesertSpawnableSupportMode = defaults.nearDesertSpawnableSupportMode();
 					}
 
-					return new Values(
+					Values loaded = new Values(
 						validSpotChance,
 						baseMaxLayers,
 						nearDesertDistance,
@@ -158,8 +159,11 @@ public final class SandLayerGenerationConfig {
 						nearDesertColumnSampleDenominator,
 						nearDesertSpawnableSupportMode
 					);
+					DarudeDiagnostics.logConfigReload(loaded, false);
+					return loaded;
 				} catch (Exception e) {
 					DarudeMod.LOGGER.warn("Failed to parse {}. Using defaults.", CONFIG_ID, e);
+					DarudeDiagnostics.logConfigReload(defaults, true);
 					return defaults;
 				}
 			})
@@ -197,7 +201,7 @@ public final class SandLayerGenerationConfig {
 		String nearDesertSpawnableSupportMode
 	) {
 		public static Values defaults() {
-			return new Values(0.3f, 4, 2, 0.2f, 0, 2, 20, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 512, 3, 256, 6, 8, "full_block");
+			return new Values(0.8f, 4, 2, 0.2f, 0, 2, 40, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 64, 3, 64, 6, 8, "full_block");
 		}
 	}
 }

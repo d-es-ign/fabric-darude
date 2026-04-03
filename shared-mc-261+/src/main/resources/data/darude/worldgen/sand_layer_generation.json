@@ -1,5 +1,5 @@
 {
-  "valid_spot_chance": 0.3,
+  "valid_spot_chance": 0.8,
   "base_max_layers": 4,
   "near_desert_distance": 2,
   "near_desert_valid_spot_chance": 0.2,
@@ -8,7 +8,7 @@
   "near_desert_column_sample_numerator": 6,
   "near_desert_column_sample_denominator": 8,
   "near_desert_spawnable_support_mode": "full_block",
-  "farming_tick_interval_ticks": 20,
+  "farming_tick_interval_ticks": 40,
   "base_under_grate_chance": 0.03,
   "base_pyramid_side_chance": 0.02,
   "full_pyramid_side_chance": 0.024,
@@ -16,7 +16,7 @@
   "full_pyramid_erode_to_pyramid_chance": 0.005,
   "pyramid_break_chance": 0.002,
   "max_fallthrough_depth": 12,
-  "max_farming_operations_per_tick": 512,
+  "max_farming_operations_per_tick": 64,
   "avalanche_slope_threshold": 3,
-  "max_topples_per_tick": 256
+  "max_topples_per_tick": 64
 }

@@ -1,5 +1,6 @@
 package com.darude.renewal;
 
+import com.darude.DarudeDiagnostics;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.Direction;
@@ -11,6 +12,7 @@ import java.util.Map;
 
 public final class SandstormWindService {
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
+	private static final boolean WIND_DISABLED = Boolean.parseBoolean(System.getProperty("darude.wind.disable", "true"));
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 	private static final Map<ServerLevel, WindState> STATES = new HashMap<>();
 	private static boolean registered;
@@ -19,6 +21,10 @@ public final class SandstormWindService {
 	}
 
 	public static synchronized void register() {
+		if (WIND_DISABLED) {
+			return;
+		}
+
 		if (registered) {
 			return;
 		}
@@ -38,6 +44,10 @@ public final class SandstormWindService {
 	}
 
 	private static void tickWorld(ServerLevel world) {
+		if (!world.isRaining()) {
+			return;
+		}
+
 		long time = world.getGameTime();
 		WindState state = STATES.computeIfAbsent(world, ignored -> new WindState(Direction.NORTH, time));
 		if (time < state.nextShiftTick) {
@@ -50,8 +60,10 @@ public final class SandstormWindService {
 			next = CARDINAL_DIRECTIONS[random.nextInt(CARDINAL_DIRECTIONS.length)];
 		}
 
+		Direction previous = state.direction;
 		state.direction = next;
 		state.nextShiftTick = time + WIND_SHIFT_TICKS;
+		DarudeDiagnostics.logWindShift(world.dimension().toString(), previous.toString(), next.toString(), time);
 	}
 
 	private static final class WindState {
