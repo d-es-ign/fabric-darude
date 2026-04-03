@@ -2,17 +2,33 @@
 
 This plan captures high-impact improvements across runtime behavior, maintainability, release readiness, and developer workflow.
 
+## Current status snapshot (Apr 2026)
+
+- ✅ **Completed**
+  - Chunkgen step-trace spam removed.
+  - CI build/release-jar flow unified to avoid duplicate builds.
+  - Avalanche no longer drops work immediately when `WindowGrid` is temporarily unavailable (centers are re-queued).
+- 🟡 **Partially completed / needs hardening**
+  - Avalanche queue retry has no explicit backoff/attempt counters/metrics yet.
+  - Worldgen support predicate migrated to `isSandLikeSupport(...)`; tag-based support remains unresolved by design.
+  - Runtime telemetry exists (`DarudeDiagnostics`) but lacks some explicit queue/defer counters.
+- 🔴 **Still open**
+  - Cross-band DRY/parity work.
+  - Stronger invariant/integration test coverage.
+  - Release/docs completeness and CI guardrails (preflight/concurrency/checksum/signing).
+
 ## 1) Prioritized roadmap
 
 ### P0 — Stability/Correctness (do first)[^p0-agent]
 
-1. **Avalanche queue loss prevention when chunk windows are unavailable**
-   - Scope: `shared-mc-121-/.../SandLayerAvalancheService.java`, `shared-mc-261+/.../SandLayerAvalancheService.java`
-   - Goal: never silently drop pending avalanche work when required chunks are not loaded.
-   - Acceptance criteria:
-     - queued work is retried/deferred, not discarded.
-     - queue size and deferred count observable in logs/metrics.
-   - Recommended Agent: `oracle`
+1. **Avalanche queue retry hardening when chunk windows are unavailable** *(Status: partial)*
+    - Scope: `shared-mc-121-/.../SandLayerAvalancheService.java`, `shared-mc-261+/.../SandLayerAvalancheService.java`
+    - Goal: never silently drop pending avalanche work when required chunks are not loaded.
+    - Acceptance criteria:
+      - queued work is retried/deferred, not discarded. ✅
+      - add retry/backoff counters and expose deferred count in diagnostics.
+      - prevent pathological perpetual requeue loops under permanently-unavailable windows.
+    - Recommended Agent: `oracle`
 
 2. **Avalanche conservation invariants under placement failures/world height edges**
    - Scope: both `SandLayerAvalancheService` band implementations
@@ -22,7 +38,7 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
      - deterministic behavior under capped budgets.
    - Recommended Agent: `explorer`
 
-3. **Farming budget fairness under deterministic ordering**
+3. **Farming budget fairness under deterministic ordering** *(Status: open)*
    - Scope: both `SandLayerFarmingService` band implementations
    - Goal: avoid starvation where some chunks/emitters never get processed under sustained load.
    - Acceptance criteria:
@@ -34,16 +50,17 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
 
 ### P1 — Performance & Runtime observability[^p1-agent]
 
-4. **Runtime counters and debug telemetry**
-   - Add per-tick counters for:
-     - farming vertical checks
-     - farming operations used
-     - avalanche queue size
-     - topples processed and deferred work
-   - Acceptance criteria:
-     - toggleable debug logging
-     - enough signal to tune config defaults safely
-   - Recommended Agent: `fixer`
+4. **Runtime counters and debug telemetry (low-noise by default)** *(Status: partial)*
+    - Add per-tick counters for:
+      - farming vertical checks
+      - farming operations used
+      - avalanche queue size
+      - topples processed and deferred work
+    - Acceptance criteria:
+      - toggleable debug logging
+      - no per-chunk/per-tick spam at INFO in normal play
+      - enough signal to tune config defaults safely
+    - Recommended Agent: `fixer`
 
 5. **Avalanche processing coalescing**
    - Goal: reduce repeated 3x3 window reads for nearby queued centers.
@@ -63,7 +80,7 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
 
 ### P1/P2 — DRY and maintenance risk reduction[^dry-agent]
 
-7. **Extract duplicated farming/avalanche logic into shared core utilities**
+7. **Extract duplicated farming/avalanche logic into shared core utilities** *(Status: open)*
    - Current duplication exists between `shared-mc-121-` and `shared-mc-261+`.
    - Goal: one behavior implementation, thin version adapters.
    - Acceptance criteria:
@@ -72,7 +89,7 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
      - no behavior divergence between bands for same scenarios
    - Recommended Agent: `oracle`
 
-8. **DRY worldgen parity pass**
+8. **DRY worldgen parity pass** *(Status: open)*
    - Scope: duplicated `SandLayerChunkGeneration` logic across bands.
    - Acceptance criteria:
      - shared decision logic extracted or generated parity checks added.
@@ -106,17 +123,19 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
 
 ### P1/P2 — Workflow hardening[^workflow-agent]
 
-11. **CI efficiency and safety improvements**
+11. **CI efficiency and safety improvements** *(Status: partial)*
     - Add:
       - Gradle cache strategy hardening
       - workflow concurrency cancellation for stale runs
       - early publish preflight (secret/input validation)
+      - config-drift check (defaults in code vs shipped JSON)
     - Acceptance criteria:
       - faster average CI time
       - no accidental publish with missing metadata/secrets.
+      - fail CI if `Values.defaults()` drifts from resource config defaults.
     - Recommended Agent: `fixer`
 
-12. **Release artifact verification**
+12. **Release artifact verification** *(Status: open)*
     - Add checksum generation + optional signing verification for jars in `release-jars`/publish pipeline.
     - Acceptance criteria:
       - artifact hash published with release notes.
@@ -151,12 +170,35 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
 
 ---
 
+### P0/P1 — Support predicate and config consistency (new)
+
+16. **Single source of truth for desert support predicate** *(Status: partial)*
+    - Current state: runtime uses `isSandLikeSupport(...)`; tag resource exists but is intentionally not relied on in core path.
+    - Goal: choose and enforce one authoritative model:
+      - Option A: restore tag-based support with proven runtime stability, or
+      - Option B: keep block-identity predicate and treat tag as informational/deprecated.
+    - Acceptance criteria:
+      - no mixed predicate behavior between main path and fallback path.
+      - docs clearly state the chosen source of truth.
+
+17. **Defaults vs JSON drift prevention** *(Status: partial)*
+    - Goal: prevent future mismatches between `SandLayerGenerationConfig.Values.defaults()` and `sand_layer_generation.json`.
+    - Acceptance criteria:
+      - automated check in CI compares key default fields.
+      - failure message points to exact field mismatch.
+
+18. **Debug instrumentation lifecycle policy** *(Status: open)*
+    - Goal: make temporary debug features safe and removable.
+    - Acceptance criteria:
+      - checklist for adding debug flags/logs/marker behavior.
+      - explicit cleanup step required before release PR merge.
+
 ## 2) 30/60/90 execution schedule[^schedule-agent]
 
 ### First 30 days
-- Finish P0 items (queue-loss prevention, conservation invariants, fairness baseline).
-- Add telemetry counters and logging toggles.
-- Convert avalanche harness into CI-executed tests.
+- Finish P0 hardening: queue retry backoff/counters, conservation invariants, fairness baseline.
+- Finalize support predicate decision (tag vs block identity) and document it.
+- Add config-drift CI check + convert avalanche harness into CI-executed tests.
 
 ### 31–60 days
 - Coalesce avalanche processing windows and optimize farming scan strategy.
@@ -172,6 +214,7 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
 
 - **High risk**: silent behavior drift due to per-band duplication.
 - **High risk**: unobserved tick spikes under dense emitter/queue scenarios.
+- **High risk**: mixed support-predicate models (tag vs code identity) causing inconsistent worldgen behavior.
 - **Medium risk**: release quality perception (missing media/docs despite technical completeness).
 - **Medium risk**: CI drift where build success does not guarantee runtime behavior correctness.
 
@@ -183,12 +226,19 @@ This plan captures high-impact improvements across runtime behavior, maintainabi
 - Release workflow is preflight-validated and artifact-verified.
 - Mod pages and docs are complete for both players and server admins.
 
+## 5) Immediate next actions (recommended)
+
+1. Add avalanche requeue retry/backoff telemetry and expose it in `DarudeDiagnostics`.
+2. Add CI config-drift check for `Values.defaults()` vs `sand_layer_generation.json`.
+3. Decide and document final desert support authority (tag or block identity).
+4. Add one deterministic integration test for chunk-window-unavailable avalanche retry behavior.
+
 [^p0-agent]: Best-fit agent: `oracle`
-[^p1-agent]: Best-fit agent: `implementer`
-[^dry-agent]: Best-fit agent: `planner`
-[^release-agent]: Best-fit agent: `documenter`
-[^workflow-agent]: Best-fit agent: `implementer`
-[^test-agent]: Best-fit agent: `reviewer`
-[^schedule-agent]: Best-fit agent: `planner`
-[^risk-agent]: Best-fit agent: `reviewer`
-[^dod-agent]: Best-fit agent: `refiner`
+[^p1-agent]: Best-fit agent: `fixer`
+[^dry-agent]: Best-fit agent: `oracle`
+[^release-agent]: Best-fit agent: `librarian`
+[^workflow-agent]: Best-fit agent: `fixer`
+[^test-agent]: Best-fit agent: `explorer`
+[^schedule-agent]: Best-fit agent: `oracle`
+[^risk-agent]: Best-fit agent: `oracle`
+[^dod-agent]: Best-fit agent: `oracle`
