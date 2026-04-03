@@ -94,6 +94,10 @@ public final class SandLayerAvalancheService {
 
 			WindowGrid grid = WindowGrid.create(world, center, CHUNK_WINDOW_RADIUS);
 			if (grid == null) {
+				queue.addLast(center);
+				if (queued != null) {
+					queued.add(center.asLong());
+				}
 				processedCenters++;
 				continue;
 			}

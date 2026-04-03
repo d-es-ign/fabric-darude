@@ -696,15 +696,7 @@ public final class SandLayerChunkGeneration {
 	// TODO: Reintroduce tag-based matching once runtime tag resolution is verified stable.
 	private static boolean isSandLikeSupport(BlockState state) {
 		return state.is(Blocks.SAND)
-			|| state.is(Blocks.RED_SAND)
 			|| state.is(Blocks.SANDSTONE)
-			|| state.is(Blocks.CUT_SANDSTONE)
-			|| state.is(Blocks.CHISELED_SANDSTONE)
-			|| state.is(Blocks.SMOOTH_SANDSTONE)
-			|| state.is(Blocks.RED_SANDSTONE)
-			|| state.is(Blocks.CUT_RED_SANDSTONE)
-			|| state.is(Blocks.CHISELED_RED_SANDSTONE)
-			|| state.is(Blocks.SMOOTH_RED_SANDSTONE)
 			|| state.is(Blocks.SUSPICIOUS_SAND);
 	}
 
