@@ -14,9 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "net.minecraft.client.renderer.fog.FogRenderer")
 public abstract class SandstormFogMixin {
 	private static final float SANDSTORM_FOG_END = 64.0f;
-	private static final float SANDSTORM_FOG_START = 48.0f;
-	private static final float GUST_FOG_END = 44.0f;
-	private static final float GUST_FOG_START = 30.0f;
+	private static final float SANDSTORM_FOG_START = 16.0f;
 
 	@Inject(
 		method = "computeFogColor(Lnet/minecraft/client/Camera;FLnet/minecraft/client/multiplayer/ClientLevel;IFLorg/joml/Vector4f;)V",
@@ -33,12 +31,11 @@ public abstract class SandstormFogMixin {
 		CallbackInfo ci
 	) {
 		Minecraft client = Minecraft.getInstance();
-		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
-		if (transitionProgress < 0.0f) {
+		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return;
 		}
 
-		float colorScale = lerp(0.78f, 0.62f, transitionProgress);
+		float colorScale = 0.62f;
 		color.mul(colorScale, colorScale * 0.92f, colorScale * 0.82f, 1.0f);
 	}
 
@@ -51,14 +48,11 @@ public abstract class SandstormFogMixin {
 	)
 	private float darude$clampRenderDistanceStart(float value) {
 		Minecraft client = Minecraft.getInstance();
-		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
-		if (transitionProgress < 0.0f) {
+		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return value;
 		}
 
-		float animatedFogStart = lerp(SANDSTORM_FOG_START, GUST_FOG_START, transitionProgress);
-
-		return Math.min(value, animatedFogStart);
+		return Math.min(value, SANDSTORM_FOG_START);
 	}
 
 	@ModifyVariable(
@@ -70,17 +64,10 @@ public abstract class SandstormFogMixin {
 	)
 	private float darude$clampRenderDistanceEnd(float value) {
 		Minecraft client = Minecraft.getInstance();
-		float transitionProgress = SandstormClientEffects.getWindTransitionProgressIfSandstormActive(client);
-		if (transitionProgress < 0.0f) {
+		if (!SandstormClientEffects.isSandstormActive(client)) {
 			return value;
 		}
 
-		float animatedFogEnd = lerp(SANDSTORM_FOG_END, GUST_FOG_END, transitionProgress);
-
-		return Math.min(value, animatedFogEnd);
-	}
-
-	private static float lerp(float start, float end, float progress) {
-		return start + (end - start) * progress;
+		return Math.min(value, SANDSTORM_FOG_END);
 	}
 }

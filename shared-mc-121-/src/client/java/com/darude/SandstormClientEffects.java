@@ -2,7 +2,9 @@ package com.darude;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.DustParticleEffect;
+import net.minecraft.block.Blocks;
+import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.math.Direction;
@@ -17,15 +19,13 @@ import java.util.List;
 
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final DustParticleEffect SAND_DUST = new DustParticleEffect(0xD8C48C, 1.0f);
+	private static final BlockStateParticleEffect SAND_GRAIN = new BlockStateParticleEffect(ParticleTypes.FALLING_DUST, Blocks.SAND.getDefaultState());
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
 	private static final int BASE_MAX_PARTICLES_PER_TICK = 48;
-	private static final float BASE_FOG_START = 48.0f;
-	private static final float BASE_FOG_END = 64.0f;
-	private static final float GUST_FOG_START = 30.0f;
-	private static final float GUST_FOG_END = 44.0f;
+	private static final float SANDSTORM_FOG_START = 16.0f;
+	private static final float SANDSTORM_FOG_END = 64.0f;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 	private static Direction windDirection = Direction.NORTH;
 	private static Direction previousWindDirection = Direction.NORTH;
@@ -76,8 +76,8 @@ public final class SandstormClientEffects {
 		double blendedWindX = lerp(previousWindDirection.getOffsetX(), windDirection.getOffsetX(), blendProgress);
 		double blendedWindZ = lerp(previousWindDirection.getOffsetZ(), windDirection.getOffsetZ(), blendProgress);
 
-		double baseVx = blendedWindX * 0.32;
-		double baseVz = blendedWindZ * 0.32;
+		double baseVx = blendedWindX * 1.15;
+		double baseVz = blendedWindZ * 1.15;
 
 		for (int i = 0; i < particleCount; i++) {
 			double xOffset = (random.nextDouble() - 0.5) * 34.0;
@@ -88,14 +88,14 @@ public final class SandstormClientEffects {
 			}
 
 			double x = origin.x + xOffset;
-			double y = origin.y + random.nextDouble() * 10.0;
+			double y = origin.y + 1.2 + (random.nextDouble() - 0.5) * 2.5;
 			double z = origin.z + zOffset;
 
-			double vx = baseVx + (random.nextDouble() - 0.5) * 0.08;
-			double vy = -0.10 - random.nextDouble() * 0.06;
-			double vz = baseVz + (random.nextDouble() - 0.5) * 0.08;
+			double vx = baseVx + (random.nextDouble() - 0.5) * 0.22;
+			double vy = -0.28 - random.nextDouble() * 0.12;
+			double vz = baseVz + (random.nextDouble() - 0.5) * 0.22;
 
-			client.particleManager.addParticle(SAND_DUST, x, y, z, vx, vy, vz);
+			client.particleManager.addParticle(SAND_GRAIN, x, y, z, vx, vy, vz);
 		}
 	}
 
@@ -227,11 +227,11 @@ public final class SandstormClientEffects {
 	}
 
 	public static float getAnimatedFogStart(MinecraftClient client) {
-		return (float) lerp(BASE_FOG_START, GUST_FOG_START, getWindTransitionProgress(client));
+		return SANDSTORM_FOG_START;
 	}
 
 	public static float getAnimatedFogEnd(MinecraftClient client) {
-		return (float) lerp(BASE_FOG_END, GUST_FOG_END, getWindTransitionProgress(client));
+		return SANDSTORM_FOG_END;
 	}
 
 	private static String getParticleModeName(MinecraftClient client) {
