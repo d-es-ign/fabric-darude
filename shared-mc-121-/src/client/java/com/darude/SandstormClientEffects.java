@@ -2,7 +2,9 @@ package com.darude;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.DustParticleEffect;
+import net.minecraft.block.Blocks;
+import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.math.Direction;
@@ -17,10 +19,7 @@ import java.util.List;
 
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final DustParticleEffect WIND_POS_X_DUST = new DustParticleEffect(0xFF00FF, 1.0f);
-	private static final DustParticleEffect WIND_NEG_X_DUST = new DustParticleEffect(0xFFFF00, 1.0f);
-	private static final DustParticleEffect WIND_POS_Z_DUST = new DustParticleEffect(0x00FF00, 1.0f);
-	private static final DustParticleEffect WIND_NEG_Z_DUST = new DustParticleEffect(0x0000FF, 1.0f);
+	private static final BlockStateParticleEffect SAND_GRAIN = new BlockStateParticleEffect(ParticleTypes.FALLING_DUST, Blocks.SAND.getDefaultState());
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -77,9 +76,8 @@ public final class SandstormClientEffects {
 		double blendedWindX = lerp(previousWindDirection.getOffsetX(), windDirection.getOffsetX(), blendProgress);
 		double blendedWindZ = lerp(previousWindDirection.getOffsetZ(), windDirection.getOffsetZ(), blendProgress);
 
-		double baseVx = blendedWindX * 1.8;
-		double baseVz = blendedWindZ * 1.8;
-		DustParticleEffect windDebugDust = getWindDebugDust(blendedWindX, blendedWindZ);
+		double baseVx = blendedWindX * 9.0;
+		double baseVz = blendedWindZ * 9.0;
 
 		for (int i = 0; i < particleCount; i++) {
 			double xOffset = (random.nextDouble() - 0.5) * 34.0;
@@ -93,20 +91,12 @@ public final class SandstormClientEffects {
 			double y = origin.y + 1.4 + (random.nextDouble() - 0.5) * 1.4;
 			double z = origin.z + zOffset;
 
-			double vx = baseVx + (random.nextDouble() - 0.5) * 0.3;
+			double vx = baseVx + (random.nextDouble() - 0.5) * 1.5;
 			double vy = -0.035;
-			double vz = baseVz + (random.nextDouble() - 0.5) * 0.3;
+			double vz = baseVz + (random.nextDouble() - 0.5) * 1.5;
 
-			client.particleManager.addParticle(windDebugDust, x, y, z, vx, vy, vz);
+			client.particleManager.addParticle(SAND_GRAIN, x, y, z, vx, vy, vz);
 		}
-	}
-
-	private static DustParticleEffect getWindDebugDust(double windX, double windZ) {
-		if (Math.abs(windX) >= Math.abs(windZ)) {
-			return windX >= 0.0 ? WIND_POS_X_DUST : WIND_NEG_X_DUST;
-		}
-
-		return windZ >= 0.0 ? WIND_POS_Z_DUST : WIND_NEG_Z_DUST;
 	}
 
 	private static void updateWindDirection(ClientWorld world, Random random) {
