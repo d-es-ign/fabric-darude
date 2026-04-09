@@ -26,7 +26,7 @@ public final class SandstormClientEffects {
 	private static final DustParticleOptions WIND_POS_Z_DUST = new DustParticleOptions(0x00FF00, 1.0f);
 	private static final DustParticleOptions WIND_NEG_Z_DUST = new DustParticleOptions(0x0000FF, 1.0f);
 	private static final float FALLING_DUST_SHARE = 0.15f;
-	private static final float STREAK_SPEED_MULTIPLIER = 8.1f;
+	private static final float STREAK_SPEED_MULTIPLIER = 1.0f;
 	private static final double FALLING_DUST_VERTICAL_VELOCITY = 0.02;
 	private static final double STREAK_VERTICAL_VELOCITY = -0.01;
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
@@ -85,8 +85,8 @@ public final class SandstormClientEffects {
 		double blendedWindX = lerp(previousWindDirection.getStepX(), windDirection.getStepX(), blendProgress);
 		double blendedWindZ = lerp(previousWindDirection.getStepZ(), windDirection.getStepZ(), blendProgress);
 
-		double baseVx = blendedWindX * 9.0;
-		double baseVz = blendedWindZ * 9.0;
+		double baseVx = blendedWindX;
+		double baseVz = blendedWindZ;
 		DustParticleOptions windDebugDust = getWindDebugDust(blendedWindX, blendedWindZ);
 
 		for (int i = 0; i < particleCount; i++) {
@@ -101,9 +101,9 @@ public final class SandstormClientEffects {
 			double y = origin.y + 1.4 + (random.nextDouble() - 0.5) * 1.4;
 			double z = origin.z + zOffset;
 
-			double vx = baseVx + (random.nextDouble() - 0.5) * 1.5;
+			double vx = baseVx;
 			double vy = STREAK_VERTICAL_VELOCITY;
-			double vz = baseVz + (random.nextDouble() - 0.5) * 1.5;
+			double vz = baseVz;
 
 			if (random.nextFloat() < FALLING_DUST_SHARE) {
 				world.addParticle(SAND_GRAIN, x, y, z, vx, FALLING_DUST_VERTICAL_VELOCITY, vz);
