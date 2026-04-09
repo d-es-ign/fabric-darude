@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.block.Blocks;
 import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
@@ -20,6 +21,9 @@ import java.util.List;
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final BlockStateParticleEffect SAND_GRAIN = new BlockStateParticleEffect(ParticleTypes.FALLING_DUST, Blocks.SAND.getDefaultState());
+	private static final DustParticleEffect SAND_STREAK = new DustParticleEffect(0xD8C48C, 1.0f);
+	private static final float FALLING_DUST_SHARE = 0.8f;
+	private static final float STREAK_SPEED_MULTIPLIER = 1.15f;
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -95,7 +99,12 @@ public final class SandstormClientEffects {
 			double vy = -0.035;
 			double vz = baseVz + (random.nextDouble() - 0.5) * 1.5;
 
-			client.particleManager.addParticle(SAND_GRAIN, x, y, z, vx, vy, vz);
+			if (random.nextFloat() < FALLING_DUST_SHARE) {
+				client.particleManager.addParticle(SAND_GRAIN, x, y, z, vx, vy, vz);
+				continue;
+			}
+
+			client.particleManager.addParticle(SAND_STREAK, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
 		}
 	}
 
