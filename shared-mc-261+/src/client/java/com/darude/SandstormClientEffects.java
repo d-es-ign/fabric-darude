@@ -4,15 +4,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -20,17 +17,14 @@ import java.util.List;
 
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final BlockParticleOption SAND_GRAIN = new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SAND.defaultBlockState());
 	private static final DustParticleOptions WIND_POS_X_DUST = new DustParticleOptions(0xFF00FF, 1.0f);
 	private static final DustParticleOptions WIND_NEG_X_DUST = new DustParticleOptions(0xFFFF00, 1.0f);
 	private static final DustParticleOptions WIND_POS_Z_DUST = new DustParticleOptions(0x00FF00, 1.0f);
 	private static final DustParticleOptions WIND_NEG_Z_DUST = new DustParticleOptions(0x0000FF, 1.0f);
-	private static final float FALLING_DUST_SHARE = 0.1f;
 	private static final float STREAK_SPEED_MULTIPLIER = 2.5f;
 	private static final double MIN_HORIZONTAL_SPEED = 3.0;
 	private static final double MAX_HORIZONTAL_SPEED = 5.0;
 	private static final double HORIZONTAL_JITTER = 0.5;
-	private static final double FALLING_DUST_VERTICAL_VELOCITY = 0.02;
 	private static final double STREAK_VERTICAL_VELOCITY = -0.01;
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
@@ -101,18 +95,13 @@ public final class SandstormClientEffects {
 			}
 
 			double x = origin.x + xOffset;
-			double y = origin.y + 1.4 + (random.nextDouble() - 0.5) * 1.4;
+			double y = origin.y + (random.nextDouble() - 0.5) * 24.0;
 			double z = origin.z + zOffset;
 
 			double horizontalSpeed = MIN_HORIZONTAL_SPEED + random.nextDouble() * (MAX_HORIZONTAL_SPEED - MIN_HORIZONTAL_SPEED);
 			double vx = baseVx * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
 			double vy = STREAK_VERTICAL_VELOCITY;
 			double vz = baseVz * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
-
-			if (random.nextFloat() < FALLING_DUST_SHARE) {
-				world.addParticle(SAND_GRAIN, x, y, z, vx, FALLING_DUST_VERTICAL_VELOCITY, vz);
-				continue;
-			}
 
 			world.addParticle(windDebugDust, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
 		}
