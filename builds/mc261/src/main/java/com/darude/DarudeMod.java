@@ -12,6 +12,7 @@ public class DarudeMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		DarudeParticles.initialize();
 		String versionBand = DarudeCommonBootstrap.initialize(new DarudePlatformAdapter261());
 		LOGGER.info("Darude initialized: sandstorms, renewable sand and sand layers [{}]", versionBand);
 	}

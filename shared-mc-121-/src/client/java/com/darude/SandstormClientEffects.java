@@ -2,7 +2,6 @@ package com.darude;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.DustParticleEffect;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.math.Direction;
@@ -17,10 +16,6 @@ import java.util.List;
 
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
-	private static final DustParticleEffect WIND_POS_X_DUST = new DustParticleEffect(0xFF00FF, 1.0f);
-	private static final DustParticleEffect WIND_NEG_X_DUST = new DustParticleEffect(0xFFFF00, 1.0f);
-	private static final DustParticleEffect WIND_POS_Z_DUST = new DustParticleEffect(0x00FF00, 1.0f);
-	private static final DustParticleEffect WIND_NEG_Z_DUST = new DustParticleEffect(0x0000FF, 1.0f);
 	private static final float STREAK_SPEED_MULTIPLIER = 2.5f;
 	private static final double MIN_HORIZONTAL_SPEED = 3.0;
 	private static final double MAX_HORIZONTAL_SPEED = 5.0;
@@ -84,7 +79,6 @@ public final class SandstormClientEffects {
 
 		double baseVx = blendedWindX;
 		double baseVz = blendedWindZ;
-		DustParticleEffect windDebugDust = getWindDebugDust(blendedWindX, blendedWindZ);
 
 		for (int i = 0; i < particleCount; i++) {
 			double xOffset = (random.nextDouble() - 0.5) * 34.0;
@@ -103,16 +97,8 @@ public final class SandstormClientEffects {
 			double vy = STREAK_VERTICAL_VELOCITY;
 			double vz = baseVz * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
 
-			client.particleManager.addParticle(windDebugDust, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
+			client.particleManager.addParticle(DarudeParticles.SANDSTORM_STREAK, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
 		}
-	}
-
-	private static DustParticleEffect getWindDebugDust(double windX, double windZ) {
-		if (Math.abs(windX) >= Math.abs(windZ)) {
-			return windX >= 0.0 ? WIND_POS_X_DUST : WIND_NEG_X_DUST;
-		}
-
-		return windZ >= 0.0 ? WIND_POS_Z_DUST : WIND_NEG_Z_DUST;
 	}
 
 	private static void updateWindDirection(ClientWorld world, Random random) {
