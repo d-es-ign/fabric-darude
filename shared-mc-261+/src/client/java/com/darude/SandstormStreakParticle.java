@@ -6,10 +6,17 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.RandomSource;
 
 public final class SandstormStreakParticle extends SingleQuadParticle {
+	private static final float SAND_RED = 216.0f / 255.0f;
+	private static final float SAND_GREEN = 196.0f / 255.0f;
+	private static final float SAND_BLUE = 140.0f / 255.0f;
+	private static final double COLLISION_MOVE_EPSILON_SQUARED = 1.0e-6;
+	private static final double COLLISION_SPEED_EPSILON_SQUARED = 1.0e-4;
+
 	private SandstormStreakParticle(
 		ClientLevel level,
 		double x,
@@ -28,7 +35,32 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 		this.gravity = 0.0f;
 		this.lifetime = 8 + this.random.nextInt(13);
 		this.quadSize = 0.14f + this.random.nextFloat() * 0.08f;
-		applyDebugDirectionColor(velocityX, velocityZ);
+		this.setColor(SAND_RED, SAND_GREEN, SAND_BLUE);
+	}
+
+	@Override
+	public void tick() {
+		double previousX = this.x;
+		double previousY = this.y;
+		double previousZ = this.z;
+		super.tick();
+		if (this.removed) {
+			return;
+		}
+
+		if (isInsideBlock()) {
+			this.remove();
+			return;
+		}
+
+		double movedX = this.x - previousX;
+		double movedY = this.y - previousY;
+		double movedZ = this.z - previousZ;
+		double movedDistanceSquared = movedX * movedX + movedY * movedY + movedZ * movedZ;
+		double speedSquared = this.xd * this.xd + this.yd * this.yd + this.zd * this.zd;
+		if (movedDistanceSquared <= COLLISION_MOVE_EPSILON_SQUARED && speedSquared >= COLLISION_SPEED_EPSILON_SQUARED) {
+			this.remove();
+		}
 	}
 
 	@Override
@@ -36,23 +68,9 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 		return SingleQuadParticle.Layer.OPAQUE;
 	}
 
-	private void applyDebugDirectionColor(double velocityX, double velocityZ) {
-		if (Math.abs(velocityX) >= Math.abs(velocityZ)) {
-			if (velocityX >= 0.0) {
-				this.setColor(1.0f, 0.0f, 1.0f);
-				return;
-			}
-
-			this.setColor(1.0f, 1.0f, 0.0f);
-			return;
-		}
-
-		if (velocityZ >= 0.0) {
-			this.setColor(0.0f, 1.0f, 0.0f);
-			return;
-		}
-
-		this.setColor(0.0f, 0.0f, 1.0f);
+	private boolean isInsideBlock() {
+		BlockPos pos = BlockPos.containing(this.x, this.y, this.z);
+		return !this.level.getBlockState(pos).isAir();
 	}
 
 	public static final class Provider implements ParticleProvider<SimpleParticleType> {
