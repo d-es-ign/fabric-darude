@@ -21,9 +21,14 @@ import java.util.List;
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final BlockStateParticleEffect SAND_GRAIN = new BlockStateParticleEffect(ParticleTypes.FALLING_DUST, Blocks.SAND.getDefaultState());
-	private static final DustParticleEffect SAND_STREAK = new DustParticleEffect(0xD8C48C, 1.0f);
-	private static final float FALLING_DUST_SHARE = 0.8f;
-	private static final float STREAK_SPEED_MULTIPLIER = 1.15f;
+	private static final DustParticleEffect WIND_POS_X_DUST = new DustParticleEffect(0xFF00FF, 1.0f);
+	private static final DustParticleEffect WIND_NEG_X_DUST = new DustParticleEffect(0xFFFF00, 1.0f);
+	private static final DustParticleEffect WIND_POS_Z_DUST = new DustParticleEffect(0x00FF00, 1.0f);
+	private static final DustParticleEffect WIND_NEG_Z_DUST = new DustParticleEffect(0x0000FF, 1.0f);
+	private static final float FALLING_DUST_SHARE = 0.15f;
+	private static final float STREAK_SPEED_MULTIPLIER = 8.1f;
+	private static final double FALLING_DUST_VERTICAL_VELOCITY = 0.02;
+	private static final double STREAK_VERTICAL_VELOCITY = -0.01;
 	private static final int WIND_SHIFT_TICKS = 20 * 6;
 	private static final int WIND_BLEND_TICKS = 20;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -82,6 +87,7 @@ public final class SandstormClientEffects {
 
 		double baseVx = blendedWindX * 9.0;
 		double baseVz = blendedWindZ * 9.0;
+		DustParticleEffect windDebugDust = getWindDebugDust(blendedWindX, blendedWindZ);
 
 		for (int i = 0; i < particleCount; i++) {
 			double xOffset = (random.nextDouble() - 0.5) * 34.0;
@@ -96,16 +102,24 @@ public final class SandstormClientEffects {
 			double z = origin.z + zOffset;
 
 			double vx = baseVx + (random.nextDouble() - 0.5) * 1.5;
-			double vy = -0.035;
+			double vy = STREAK_VERTICAL_VELOCITY;
 			double vz = baseVz + (random.nextDouble() - 0.5) * 1.5;
 
 			if (random.nextFloat() < FALLING_DUST_SHARE) {
-				client.particleManager.addParticle(SAND_GRAIN, x, y, z, vx, vy, vz);
+				client.particleManager.addParticle(SAND_GRAIN, x, y, z, vx, FALLING_DUST_VERTICAL_VELOCITY, vz);
 				continue;
 			}
 
-			client.particleManager.addParticle(SAND_STREAK, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
+			client.particleManager.addParticle(windDebugDust, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
 		}
+	}
+
+	private static DustParticleEffect getWindDebugDust(double windX, double windZ) {
+		if (Math.abs(windX) >= Math.abs(windZ)) {
+			return windX >= 0.0 ? WIND_POS_X_DUST : WIND_NEG_X_DUST;
+		}
+
+		return windZ >= 0.0 ? WIND_POS_Z_DUST : WIND_NEG_Z_DUST;
 	}
 
 	private static void updateWindDirection(ClientWorld world, Random random) {
