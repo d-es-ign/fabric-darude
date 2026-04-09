@@ -3,14 +3,12 @@ package com.darude;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.client.particle.TextureSheetParticle;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.util.RandomSource;
 
-public final class SandstormStreakParticle extends TextureSheetParticle {
-	private final SpriteSet sprites;
-
+public final class SandstormStreakParticle extends SingleQuadParticle {
 	private SandstormStreakParticle(
 		ClientLevel level,
 		double x,
@@ -21,8 +19,7 @@ public final class SandstormStreakParticle extends TextureSheetParticle {
 		double velocityZ,
 		SpriteSet sprites
 	) {
-		super(level, x, y, z, velocityX, velocityY, velocityZ);
-		this.sprites = sprites;
+		super(level, x, y, z, sprites.get(level.random));
 		this.xd = velocityX;
 		this.yd = velocityY;
 		this.zd = velocityZ;
@@ -31,18 +28,11 @@ public final class SandstormStreakParticle extends TextureSheetParticle {
 		this.lifetime = 8 + this.random.nextInt(13);
 		this.quadSize = 0.14f + this.random.nextFloat() * 0.08f;
 		applyDebugDirectionColor(velocityX, velocityZ);
-		this.setSpriteFromAge(sprites);
 	}
 
 	@Override
-	public void tick() {
-		super.tick();
-		this.setSpriteFromAge(this.sprites);
-	}
-
-	@Override
-	public ParticleRenderType getRenderType() {
-		return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
+	public SingleQuadParticle.Layer getLayer() {
+		return SingleQuadParticle.Layer.OPAQUE;
 	}
 
 	private void applyDebugDirectionColor(double velocityX, double velocityZ) {
@@ -80,7 +70,8 @@ public final class SandstormStreakParticle extends TextureSheetParticle {
 			double z,
 			double velocityX,
 			double velocityY,
-			double velocityZ
+			double velocityZ,
+			RandomSource random
 		) {
 			return new SandstormStreakParticle(level, x, y, z, velocityX, velocityY, velocityZ, this.sprites);
 		}

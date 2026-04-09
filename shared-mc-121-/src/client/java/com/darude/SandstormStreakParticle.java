@@ -1,15 +1,15 @@
 package com.darude;
 
+import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.client.particle.ParticleTextureSheet;
-import net.minecraft.client.particle.SpriteBillboardParticle;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.util.math.random.Random;
 
-public final class SandstormStreakParticle extends SpriteBillboardParticle {
-	private final SpriteProvider spriteProvider;
+public final class SandstormStreakParticle extends BillboardParticle {
+	private final SpriteProvider sprites;
 
 	private SandstormStreakParticle(
 		ClientWorld world,
@@ -19,10 +19,10 @@ public final class SandstormStreakParticle extends SpriteBillboardParticle {
 		double velocityX,
 		double velocityY,
 		double velocityZ,
-		SpriteProvider spriteProvider
+		SpriteProvider sprites
 	) {
-		super(world, x, y, z, velocityX, velocityY, velocityZ);
-		this.spriteProvider = spriteProvider;
+		super(world, x, y, z, sprites.getFirst());
+		this.sprites = sprites;
 		this.velocityX = velocityX;
 		this.velocityY = velocityY;
 		this.velocityZ = velocityZ;
@@ -31,18 +31,20 @@ public final class SandstormStreakParticle extends SpriteBillboardParticle {
 		this.maxAge = 8 + this.random.nextInt(13);
 		this.scale = 0.14f + this.random.nextFloat() * 0.08f;
 		applyDebugDirectionColor(velocityX, velocityZ);
-		this.setSpriteForAge(spriteProvider);
+		this.updateSprite(this.sprites);
 	}
 
 	@Override
 	public void tick() {
 		super.tick();
-		this.setSpriteForAge(this.spriteProvider);
+		if (!this.dead) {
+			this.updateSprite(this.sprites);
+		}
 	}
 
 	@Override
-	public ParticleTextureSheet getType() {
-		return ParticleTextureSheet.PARTICLE_SHEET_TRANSLUCENT;
+	public BillboardParticle.RenderType getRenderType() {
+		return BillboardParticle.RenderType.PARTICLE_ATLAS_TRANSLUCENT;
 	}
 
 	private void applyDebugDirectionColor(double velocityX, double velocityZ) {
@@ -80,7 +82,8 @@ public final class SandstormStreakParticle extends SpriteBillboardParticle {
 			double z,
 			double velocityX,
 			double velocityY,
-			double velocityZ
+			double velocityZ,
+			Random random
 		) {
 			return new SandstormStreakParticle(world, x, y, z, velocityX, velocityY, velocityZ, this.sprites);
 		}
