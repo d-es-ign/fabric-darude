@@ -5,6 +5,7 @@ import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.RandomSource;
 
@@ -17,9 +18,9 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 		double velocityX,
 		double velocityY,
 		double velocityZ,
-		SpriteSet sprites
+		TextureAtlasSprite sprite
 	) {
-		super(level, x, y, z, sprites.get(level.random));
+		super(level, x, y, z, sprite);
 		this.xd = velocityX;
 		this.yd = velocityY;
 		this.zd = velocityZ;
@@ -73,7 +74,7 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 			double velocityZ,
 			RandomSource random
 		) {
-			return new SandstormStreakParticle(level, x, y, z, velocityX, velocityY, velocityZ, this.sprites);
+			return new SandstormStreakParticle(level, x, y, z, velocityX, velocityY, velocityZ, this.sprites.get(random));
 		}
 	}
 }
