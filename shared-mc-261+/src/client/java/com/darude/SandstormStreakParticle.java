@@ -6,16 +6,18 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.RandomSource;
 
+import java.lang.reflect.Field;
+
 public final class SandstormStreakParticle extends SingleQuadParticle {
-	private static final float SAND_RED = 216.0f / 255.0f;
-	private static final float SAND_GREEN = 196.0f / 255.0f;
-	private static final float SAND_BLUE = 140.0f / 255.0f;
-	private static final double COLLISION_MOVE_EPSILON_SQUARED = 1.0e-6;
-	private static final double COLLISION_SPEED_EPSILON_SQUARED = 1.0e-4;
+	private static final float[][] SAND_COLOR_PALETTE = {
+		{216.0f / 255.0f, 196.0f / 255.0f, 140.0f / 255.0f},
+		{228.0f / 255.0f, 210.0f / 255.0f, 166.0f / 255.0f},
+		{204.0f / 255.0f, 184.0f / 255.0f, 138.0f / 255.0f},
+		{236.0f / 255.0f, 223.0f / 255.0f, 186.0f / 255.0f}
+	};
 
 	private SandstormStreakParticle(
 		ClientLevel level,
@@ -31,36 +33,17 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 		this.xd = velocityX;
 		this.yd = velocityY;
 		this.zd = velocityZ;
+		disableWorldCollision(this);
 		this.friction = 0.98f;
 		this.gravity = 0.0f;
 		this.lifetime = 8 + this.random.nextInt(13);
 		this.quadSize = 0.14f + this.random.nextFloat() * 0.08f;
-		this.setColor(SAND_RED, SAND_GREEN, SAND_BLUE);
+		applySandPaletteColor(this.random);
 	}
 
 	@Override
 	public void tick() {
-		double previousX = this.x;
-		double previousY = this.y;
-		double previousZ = this.z;
 		super.tick();
-		if (this.removed) {
-			return;
-		}
-
-		if (isInsideBlock()) {
-			this.remove();
-			return;
-		}
-
-		double movedX = this.x - previousX;
-		double movedY = this.y - previousY;
-		double movedZ = this.z - previousZ;
-		double movedDistanceSquared = movedX * movedX + movedY * movedY + movedZ * movedZ;
-		double speedSquared = this.xd * this.xd + this.yd * this.yd + this.zd * this.zd;
-		if (movedDistanceSquared <= COLLISION_MOVE_EPSILON_SQUARED && speedSquared >= COLLISION_SPEED_EPSILON_SQUARED) {
-			this.remove();
-		}
 	}
 
 	@Override
@@ -68,9 +51,30 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 		return SingleQuadParticle.Layer.OPAQUE;
 	}
 
-	private boolean isInsideBlock() {
-		BlockPos pos = BlockPos.containing(this.x, this.y, this.z);
-		return !this.level.getBlockState(pos).isAir();
+	private void applySandPaletteColor(RandomSource random) {
+		float[] color = SAND_COLOR_PALETTE[random.nextInt(SAND_COLOR_PALETTE.length)];
+		this.setColor(color[0], color[1], color[2]);
+	}
+
+	private static void disableWorldCollision(SingleQuadParticle particle) {
+		setBooleanFieldIfPresent(particle, "collidesWithWorld", false);
+		setBooleanFieldIfPresent(particle, "hasPhysics", false);
+	}
+
+	private static void setBooleanFieldIfPresent(Object target, String fieldName, boolean value) {
+		Class<?> owner = target.getClass();
+		while (owner != null) {
+			try {
+				Field field = owner.getDeclaredField(fieldName);
+				field.setAccessible(true);
+				field.setBoolean(target, value);
+				return;
+			} catch (NoSuchFieldException ignored) {
+				owner = owner.getSuperclass();
+			} catch (IllegalAccessException ignored) {
+				return;
+			}
+		}
 	}
 
 	public static final class Provider implements ParticleProvider<SimpleParticleType> {

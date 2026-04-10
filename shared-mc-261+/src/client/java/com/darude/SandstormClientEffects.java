@@ -21,10 +21,13 @@ public final class SandstormClientEffects {
 	private static final double MAX_HORIZONTAL_SPEED = 5.0;
 	private static final double HORIZONTAL_JITTER = 0.5;
 	private static final double STREAK_VERTICAL_VELOCITY = -0.01;
+	private static final double PARTICLE_SPAWN_RADIUS = 56.0;
+	private static final double UPWIND_SPAWN_BIAS = 24.0;
+	private static final float PARTICLE_DENSITY_BOOST = 1.6f;
 	private static final int WIND_SHIFT_TICKS = 20 * 10;
 	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
-	private static final int BASE_MAX_PARTICLES_PER_TICK = 48;
+	private static final int BASE_MAX_PARTICLES_PER_TICK = 96;
 	private static final float SANDSTORM_FOG_START = 16.0f;
 	private static final float SANDSTORM_FOG_END = 64.0f;
 	private static final Direction[] CARDINAL_DIRECTIONS = new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
@@ -67,7 +70,7 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier);
+		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier * PARTICLE_DENSITY_BOOST);
 		particleCount = Math.min(particleCount, tuning.maxPerTick);
 		if (particleCount <= 0) {
 			return;
@@ -81,12 +84,8 @@ public final class SandstormClientEffects {
 		double baseVz = blendedWindZ;
 
 		for (int i = 0; i < particleCount; i++) {
-			double xOffset = (random.nextDouble() - 0.5) * 34.0;
-			double zOffset = (random.nextDouble() - 0.5) * 34.0;
-			double distanceRatio = (xOffset * xOffset + zOffset * zOffset) / (34.0 * 34.0);
-			if (random.nextDouble() > (1.0 - Math.min(1.0, distanceRatio))) {
-				continue;
-			}
+			double xOffset = (random.nextDouble() - 0.5) * (PARTICLE_SPAWN_RADIUS * 2.0) - blendedWindX * UPWIND_SPAWN_BIAS;
+			double zOffset = (random.nextDouble() - 0.5) * (PARTICLE_SPAWN_RADIUS * 2.0) - blendedWindZ * UPWIND_SPAWN_BIAS;
 
 			double x = origin.x + xOffset;
 			double y = origin.y + (random.nextDouble() - 0.5) * 24.0;

@@ -1,5 +1,6 @@
 {
 	"textures": [
-		"darude:sandstorm_streak"
+		"darude:sandstorm_streak",
+		"darude:sandstorm_streak_light"
 	]
 }
