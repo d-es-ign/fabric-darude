@@ -8,6 +8,7 @@ import com.darude.worldgen.SandLayerGenerationConfig;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.world.GameRules;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -37,7 +38,7 @@ public final class SandLayerFarmingService {
 	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 256;
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
-	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "true"));
+	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> FARMING_EMITTERS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
@@ -65,7 +66,9 @@ public final class SandLayerFarmingService {
 		}
 
 		long gameTime = world.getTime();
-		if (gameTime % config.farmingTickIntervalTicks() != 0L) {
+		int randomTickSpeed = Math.max(1, world.getGameRules().getInt(GameRules.RANDOM_TICK_SPEED));
+		int effectiveIntervalTicks = Math.max(1, config.farmingTickIntervalTicks() / randomTickSpeed);
+		if (gameTime % effectiveIntervalTicks != 0L) {
 			return;
 		}
 
