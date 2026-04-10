@@ -35,7 +35,7 @@ public final class SandstormOverlayRenderer {
 
 		int width = client.getWindow().getScaledWidth();
 		int height = client.getWindow().getScaledHeight();
-		long gameTime = client.level != null ? client.level.getTime() : 0L;
+		long gameTime = client.world != null ? client.world.getTime() : 0L;
 		int phase = (int) ((gameTime / NOISE_PHASE_TICKS) % NOISE_SEEDS.length);
 		int phaseSeed = NOISE_SEEDS[phase];
 		int phaseShiftX = NOISE_SHIFT_X[phase];
