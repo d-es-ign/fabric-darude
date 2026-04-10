@@ -8,7 +8,6 @@ import com.darude.worldgen.SandLayerGenerationConfig;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.world.GameRules;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -27,6 +26,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 /**
  * V1 sand-layer farming runtime.
@@ -66,7 +67,7 @@ public final class SandLayerFarmingService {
 		}
 
 		long gameTime = world.getTime();
-		int randomTickSpeed = Math.max(1, world.getGameRules().getInt(GameRules.RANDOM_TICK_SPEED));
+		int randomTickSpeed = resolveRandomTickSpeed(world);
 		int effectiveIntervalTicks = Math.max(1, config.farmingTickIntervalTicks() / randomTickSpeed);
 		if (gameTime % effectiveIntervalTicks != 0L) {
 			return;
@@ -130,6 +131,37 @@ public final class SandLayerFarmingService {
 			}
 		}
 		return chunks;
+	}
+
+	private static int resolveRandomTickSpeed(ServerWorld world) {
+		Object gameRules = world.getGameRules();
+		int resolved = readRandomTickSpeedReflective(gameRules, "net.minecraft.world.GameRules");
+		if (resolved > 0) {
+			return resolved;
+		}
+
+		resolved = readRandomTickSpeedReflective(gameRules, "net.minecraft.world.level.GameRules");
+		if (resolved > 0) {
+			return resolved;
+		}
+
+		return 1;
+	}
+
+	private static int readRandomTickSpeedReflective(Object gameRules, String gameRulesClassName) {
+		try {
+			Class<?> gameRulesClass = Class.forName(gameRulesClassName);
+			Field randomTickSpeedField = gameRulesClass.getField("RANDOM_TICK_SPEED");
+			Object randomTickKey = randomTickSpeedField.get(null);
+			Method getInt = gameRules.getClass().getMethod("getInt", randomTickKey.getClass());
+			Object value = getInt.invoke(gameRules, randomTickKey);
+			if (value instanceof Integer intValue) {
+				return Math.max(1, intValue);
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
+
+		return -1;
 	}
 
 	private static void scanChunk(
