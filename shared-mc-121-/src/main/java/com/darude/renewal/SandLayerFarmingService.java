@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.WeakHashMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -40,9 +41,11 @@ public final class SandLayerFarmingService {
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
+	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> FARMING_EMITTERS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
+	private static final WeakHashMap<ServerWorld, Boolean> AMPLIFIED_WORLD_CACHE = new WeakHashMap<>();
 
 	private SandLayerFarmingService() {
 	}
@@ -85,6 +88,7 @@ public final class SandLayerFarmingService {
 		int[] operationsUsed = new int[]{0};
 		int[] verticalChecksUsed = new int[]{0};
 		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, config.maxFarmingOperationsPerTick() * 32);
+		int emitterMaxY = resolveEmitterMaxY(world);
 		long startedAtNanos = System.nanoTime();
 		long deadlineNanos = startedAtNanos + MAX_FARMING_WORK_NANOS;
 
@@ -104,7 +108,7 @@ public final class SandLayerFarmingService {
 				continue;
 			}
 
-			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
+			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks, deadlineNanos, emitterMaxY);
 		}
 
 		if (System.nanoTime() >= deadlineNanos && Boolean.getBoolean("darude.debug.hotspots")) {
@@ -164,6 +168,71 @@ public final class SandLayerFarmingService {
 		return -1;
 	}
 
+	private static int resolveEmitterMaxY(ServerWorld world) {
+		if (isAmplifiedWorld(world)) {
+			return world.getTopYInclusive();
+		}
+
+		return Math.min(world.getTopYInclusive(), DEFAULT_EMITTER_MAX_Y);
+	}
+
+	private static boolean isAmplifiedWorld(ServerWorld world) {
+		Boolean cached = AMPLIFIED_WORLD_CACHE.get(world);
+		if (cached != null) {
+			return cached;
+		}
+
+		boolean amplified = containsAmplifiedHint(world);
+		AMPLIFIED_WORLD_CACHE.put(world, amplified);
+		return amplified;
+	}
+
+	private static boolean containsAmplifiedHint(ServerWorld world) {
+		Object chunkManager = invokeAny(world, "getChunkManager", "getChunkSource");
+		if (containsAmplifiedText(chunkManager)) {
+			return true;
+		}
+
+		Object chunkGenerator = invokeAny(chunkManager, "getChunkGenerator", "getGenerator");
+		if (containsAmplifiedText(chunkGenerator)) {
+			return true;
+		}
+
+		Object settings = invokeAny(chunkGenerator, "getSettings", "settings");
+		if (containsAmplifiedText(settings)) {
+			return true;
+		}
+
+		Object server = invokeAny(world, "getServer");
+		Object saveData = invokeAny(server, "getSaveProperties", "getWorldData", "getSaveData");
+		return containsAmplifiedText(saveData);
+	}
+
+	private static Object invokeAny(Object target, String... methodNames) {
+		if (target == null) {
+			return null;
+		}
+
+		for (String methodName : methodNames) {
+			try {
+				Method method = target.getClass().getMethod(methodName);
+				return method.invoke(target);
+			} catch (ReflectiveOperationException ignored) {
+			}
+		}
+
+		return null;
+	}
+
+	private static boolean containsAmplifiedText(Object value) {
+		if (value == null) {
+			return false;
+		}
+
+		String text = value.toString().toLowerCase();
+		return text.contains("amplified");
+	}
+
 	private static void scanChunk(
 		ServerWorld world,
 		WorldChunk chunk,
@@ -175,7 +244,8 @@ public final class SandLayerFarmingService {
 		int[] operationsUsed,
 		int[] verticalChecksUsed,
 		int maxVerticalChecks,
-		long deadlineNanos
+		long deadlineNanos,
+		int emitterMaxY
 	) {
 		ChunkPos chunkPos = chunk.getPos();
 		if (!isChunkInSandstormBiome(world, chunkPos, chunkBiomeCache)) {
@@ -198,14 +268,13 @@ public final class SandLayerFarmingService {
 					continue;
 				}
 
-				int topSurfaceY = Math.min(world.getTopYInclusive(), world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1);
-				if (topSurfaceY < world.getBottomY()) {
+				int minY = Math.max(world.getBottomY(), world.getSeaLevel() + 1);
+				int maxY = Math.min(world.getTopYInclusive(), emitterMaxY);
+				if (maxY < minY) {
 					continue;
 				}
 
-				int minY = Math.max(world.getBottomY(), topSurfaceY - MAX_EMITTER_DEPTH_FROM_SURFACE);
-
-				for (int y = topSurfaceY; y >= minY; y--) {
+				for (int y = maxY; y >= minY; y--) {
 					if (System.nanoTime() >= deadlineNanos) {
 						return;
 					}
