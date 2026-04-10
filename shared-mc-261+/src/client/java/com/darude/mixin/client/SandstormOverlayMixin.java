@@ -15,9 +15,4 @@ public abstract class SandstormOverlayMixin {
 	private void darude$renderSandstormOverlayModern(GuiGraphicsExtractor drawContext, DeltaTracker tickCounter, CallbackInfo ci) {
 		SandstormOverlayRenderer.render(drawContext, Minecraft.getInstance());
 	}
-
-	@Inject(method = "render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;F)V", at = @At("TAIL"), require = 0)
-	private void darude$renderSandstormOverlayLegacy(GuiGraphicsExtractor drawContext, float tickDelta, CallbackInfo ci) {
-		SandstormOverlayRenderer.render(drawContext, Minecraft.getInstance());
-	}
 }

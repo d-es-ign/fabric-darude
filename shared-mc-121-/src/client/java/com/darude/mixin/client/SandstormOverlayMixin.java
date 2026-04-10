@@ -15,9 +15,4 @@ public abstract class SandstormOverlayMixin {
 	private void darude$renderSandstormOverlayModern(DrawContext drawContext, RenderTickCounter tickCounter, CallbackInfo ci) {
 		SandstormOverlayRenderer.render(drawContext, MinecraftClient.getInstance());
 	}
-
-	@Inject(method = "render(Lnet/minecraft/client/gui/DrawContext;F)V", at = @At("TAIL"), require = 0)
-	private void darude$renderSandstormOverlayLegacy(DrawContext drawContext, float tickDelta, CallbackInfo ci) {
-		SandstormOverlayRenderer.render(drawContext, MinecraftClient.getInstance());
-	}
 }
