@@ -21,8 +21,8 @@ public final class SandstormClientEffects {
 	private static final double MAX_HORIZONTAL_SPEED = 5.0;
 	private static final double HORIZONTAL_JITTER = 0.5;
 	private static final double STREAK_VERTICAL_VELOCITY = -0.01;
-	private static final int WIND_SHIFT_TICKS = 20 * 6;
-	private static final int WIND_BLEND_TICKS = 20;
+	private static final int WIND_SHIFT_TICKS = 20 * 10;
+	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
 	private static final int BASE_MAX_PARTICLES_PER_TICK = 48;
 	private static final float SANDSTORM_FOG_START = 16.0f;
