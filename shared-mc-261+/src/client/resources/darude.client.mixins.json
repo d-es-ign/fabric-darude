@@ -3,7 +3,8 @@
 	"package": "com.darude.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"SandstormDebugHudMixin"
+		"SandstormDebugHudMixin",
+		"SandstormOverlayMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
