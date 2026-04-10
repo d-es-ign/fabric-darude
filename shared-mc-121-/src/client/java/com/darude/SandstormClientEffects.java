@@ -8,11 +8,15 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.WeakHashMap;
+import java.lang.reflect.Method;
 
 public final class SandstormClientEffects {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
@@ -24,6 +28,10 @@ public final class SandstormClientEffects {
 	private static final double PARTICLE_SPAWN_RADIUS = 56.0;
 	private static final double UPWIND_SPAWN_BIAS = 24.0;
 	private static final float PARTICLE_DENSITY_BOOST = 1.6f;
+	private static final int PARTICLE_MIN_Y = 60;
+	private static final int DEFAULT_PARTICLE_MAX_Y = 100;
+	private static final double ABOVE_TERRAIN_TAPER_RANGE = 32.0;
+	private static final double HIGH_ALTITUDE_TAPER_RANGE = 24.0;
 	private static final int WIND_SHIFT_TICKS = 20 * 10;
 	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -40,6 +48,7 @@ public final class SandstormClientEffects {
 	private static long cachedSandstormTick = Long.MIN_VALUE;
 	private static long cachedSandstormCameraPos = Long.MIN_VALUE;
 	private static boolean cachedSandstormActive;
+	private static final WeakHashMap<ClientWorld, Boolean> AMPLIFIED_WORLD_CACHE = new WeakHashMap<>();
 
 	private SandstormClientEffects() {
 	}
@@ -70,7 +79,19 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier * PARTICLE_DENSITY_BOOST);
+		int particleMinY = Math.max(world.getBottomY(), PARTICLE_MIN_Y);
+		int particleMaxY = resolveParticleMaxY(world);
+		if (particleMaxY <= particleMinY) {
+			return;
+		}
+
+		double terrainY = world.getTopY(Heightmap.Type.WORLD_SURFACE, BlockPos.ofFloored(origin).getX(), BlockPos.ofFloored(origin).getZ()) - 1;
+		double altitudeTaper = computeAltitudeTaper(origin.y, terrainY, particleMaxY);
+		if (altitudeTaper <= 0.0) {
+			return;
+		}
+
+		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier * PARTICLE_DENSITY_BOOST * (float) altitudeTaper);
 		particleCount = Math.min(particleCount, tuning.maxPerTick);
 		if (particleCount <= 0) {
 			return;
@@ -90,6 +111,15 @@ public final class SandstormClientEffects {
 			double x = origin.x + xOffset;
 			double y = origin.y + (random.nextDouble() - 0.5) * 24.0;
 			double z = origin.z + zOffset;
+			if (y < particleMinY || y > particleMaxY) {
+				continue;
+			}
+
+			double columnTerrainY = world.getTopY(Heightmap.Type.WORLD_SURFACE, (int) Math.floor(x), (int) Math.floor(z)) - 1;
+			double terrainTaper = computeAboveTerrainTaper(y, columnTerrainY);
+			if (terrainTaper <= 0.0 || random.nextDouble() > terrainTaper) {
+				continue;
+			}
 
 			double horizontalSpeed = MIN_HORIZONTAL_SPEED + random.nextDouble() * (MAX_HORIZONTAL_SPEED - MIN_HORIZONTAL_SPEED);
 			double vx = baseVx * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
@@ -98,6 +128,86 @@ public final class SandstormClientEffects {
 
 			client.particleManager.addParticle(DarudeParticles.SANDSTORM_STREAK, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
 		}
+	}
+
+	private static double computeAltitudeTaper(double cameraY, double terrainY, int particleMaxY) {
+		if (cameraY <= terrainY) {
+			return 1.0;
+		}
+
+		double taperByTerrain = 1.0 - Math.min(1.0, (cameraY - terrainY) / HIGH_ALTITUDE_TAPER_RANGE);
+		double taperByCap = 1.0 - Math.min(1.0, Math.max(0.0, (cameraY - particleMaxY)) / HIGH_ALTITUDE_TAPER_RANGE);
+		return Math.max(0.0, Math.min(taperByTerrain, taperByCap));
+	}
+
+	private static double computeAboveTerrainTaper(double particleY, double terrainY) {
+		if (particleY <= terrainY) {
+			return 1.0;
+		}
+
+		return Math.max(0.0, 1.0 - ((particleY - terrainY) / ABOVE_TERRAIN_TAPER_RANGE));
+	}
+
+	private static int resolveParticleMaxY(ClientWorld world) {
+		if (isAmplifiedWorld(world)) {
+			return world.getTopYInclusive();
+		}
+
+		return Math.min(world.getTopYInclusive(), DEFAULT_PARTICLE_MAX_Y);
+	}
+
+	private static boolean isAmplifiedWorld(ClientWorld world) {
+		Boolean cached = AMPLIFIED_WORLD_CACHE.get(world);
+		if (cached != null) {
+			return cached;
+		}
+
+		boolean amplified = containsAmplifiedHint(world);
+		AMPLIFIED_WORLD_CACHE.put(world, amplified);
+		return amplified;
+	}
+
+	private static boolean containsAmplifiedHint(ClientWorld world) {
+		if (containsAmplifiedText(world)) {
+			return true;
+		}
+
+		Object manager = invokeAny(world, "getChunkManager", "getChunkSource");
+		if (containsAmplifiedText(manager)) {
+			return true;
+		}
+
+		Object generator = invokeAny(manager, "getChunkGenerator", "getGenerator");
+		if (containsAmplifiedText(generator)) {
+			return true;
+		}
+
+		Object properties = invokeAny(world, "getLevelProperties", "getProperties");
+		return containsAmplifiedText(properties);
+	}
+
+	private static Object invokeAny(Object target, String... methodNames) {
+		if (target == null) {
+			return null;
+		}
+
+		for (String methodName : methodNames) {
+			try {
+				Method method = target.getClass().getMethod(methodName);
+				return method.invoke(target);
+			} catch (ReflectiveOperationException ignored) {
+			}
+		}
+
+		return null;
+	}
+
+	private static boolean containsAmplifiedText(Object value) {
+		if (value == null) {
+			return false;
+		}
+
+		return value.toString().toLowerCase().contains("amplified");
 	}
 
 	private static void updateWindDirection(ClientWorld world, Random random) {
@@ -282,6 +392,10 @@ public final class SandstormClientEffects {
 		}
 
 		BlockPos pos = BlockPos.ofFloored(cameraPos);
+		if (world.getFluidState(pos).isOf(Fluids.WATER)) {
+			return false;
+		}
+
 		if (!world.isSkyVisible(pos)) {
 			return false;
 		}
