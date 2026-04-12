@@ -6,6 +6,7 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.RandomSource;
 
@@ -18,6 +19,8 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 		{204.0f / 255.0f, 184.0f / 255.0f, 138.0f / 255.0f},
 		{236.0f / 255.0f, 223.0f / 255.0f, 186.0f / 255.0f}
 	};
+
+	private static final float INSIDE_SOLID_KILL_CHANCE = readFloatProperty("darude.client.inside_solid_kill_chance", 0.35f);
 
 	private SandstormStreakParticle(
 		ClientLevel level,
@@ -44,6 +47,9 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 	@Override
 	public void tick() {
 		super.tick();
+		if (INSIDE_SOLID_KILL_CHANCE > 0.0f && isInsideSolid() && this.random.nextFloat() < INSIDE_SOLID_KILL_CHANCE) {
+			this.remove();
+		}
 	}
 
 	@Override
@@ -74,6 +80,24 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 			} catch (IllegalAccessException ignored) {
 				return;
 			}
+		}
+	}
+
+	private boolean isInsideSolid() {
+		BlockPos pos = BlockPos.containing(this.x, this.y, this.z);
+		return !this.level.getBlockState(pos).isAir() && this.level.getFluidState(pos).isEmpty();
+	}
+
+	private static float readFloatProperty(String key, float fallback) {
+		String value = System.getProperty(key);
+		if (value == null) {
+			return fallback;
+		}
+
+		try {
+			return Math.max(0.0f, Math.min(1.0f, Float.parseFloat(value)));
+		} catch (NumberFormatException ignored) {
+			return fallback;
 		}
 	}
 

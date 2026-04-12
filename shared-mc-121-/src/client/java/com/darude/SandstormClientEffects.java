@@ -34,6 +34,8 @@ public final class SandstormClientEffects {
 	private static final double ABOVE_TERRAIN_TAPER_RANGE = 32.0;
 	private static final double HIGH_ALTITUDE_TAPER_RANGE = 24.0;
 	private static final double OCCLUSION_SAMPLE_Y_OFFSET = 1.2;
+	private static final double WALL_MASK_DISTANCE = readDoubleProperty("darude.client.wall_mask_distance", 1.5);
+	private static final double OCCLUSION_STRENGTH = clamp01(readDoubleProperty("darude.client.occlusion_strength", 0.75));
 	private static final int WIND_SHIFT_TICKS = 20 * 10;
 	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -129,6 +131,10 @@ public final class SandstormClientEffects {
 				continue;
 			}
 
+			if (isWallMaskedSpawn(world, x, y, z, blendedWindX, blendedWindZ, random)) {
+				continue;
+			}
+
 			double horizontalSpeed = MIN_HORIZONTAL_SPEED + random.nextDouble() * (MAX_HORIZONTAL_SPEED - MIN_HORIZONTAL_SPEED);
 			double vx = baseVx * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
 			double vy = STREAK_VERTICAL_VELOCITY;
@@ -201,11 +207,38 @@ public final class SandstormClientEffects {
 		}
 
 		double blockedRatio = blockedSamples / (double) totalSamples;
-		if (blockedRatio >= 0.9) {
+		double reducedByOcclusion = blockedRatio * OCCLUSION_STRENGTH;
+		if (reducedByOcclusion >= 0.9) {
 			return 0.0;
 		}
 
-		return Math.max(0.0, 1.0 - blockedRatio);
+		return Math.max(0.0, 1.0 - reducedByOcclusion);
+	}
+
+	private static boolean isWallMaskedSpawn(ClientWorld world, double x, double y, double z, double windX, double windZ, Random random) {
+		if (WALL_MASK_DISTANCE <= 0.0 || OCCLUSION_STRENGTH <= 0.0) {
+			return false;
+		}
+
+		double magnitude = Math.sqrt(windX * windX + windZ * windZ);
+		if (magnitude < 1.0e-4) {
+			return false;
+		}
+
+		double dirX = windX / magnitude;
+		double dirZ = windZ / magnitude;
+		int samples = Math.max(1, (int) Math.ceil(WALL_MASK_DISTANCE / 0.5));
+		for (int i = 1; i <= samples; i++) {
+			double distance = i * 0.5;
+			double sampleX = x - dirX * distance;
+			double sampleY = y;
+			double sampleZ = z - dirZ * distance;
+			if (isSolidOccluder(world, BlockPos.ofFloored(sampleX, sampleY, sampleZ))) {
+				return random.nextDouble() < OCCLUSION_STRENGTH;
+			}
+		}
+
+		return false;
 	}
 
 	private static boolean isSolidOccluder(ClientWorld world, BlockPos pos) {
@@ -294,6 +327,23 @@ public final class SandstormClientEffects {
 		}
 
 		return value.toString().toLowerCase().contains("amplified");
+	}
+
+	private static double readDoubleProperty(String key, double fallback) {
+		String value = System.getProperty(key);
+		if (value == null) {
+			return fallback;
+		}
+
+		try {
+			return Double.parseDouble(value);
+		} catch (NumberFormatException ignored) {
+			return fallback;
+		}
+	}
+
+	private static double clamp01(double value) {
+		return Math.max(0.0, Math.min(1.0, value));
 	}
 
 	private enum OcclusionQuality {

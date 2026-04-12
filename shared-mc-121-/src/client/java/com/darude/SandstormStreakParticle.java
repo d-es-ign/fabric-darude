@@ -6,6 +6,7 @@ import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 
 import java.lang.reflect.Field;
@@ -19,6 +20,7 @@ public final class SandstormStreakParticle extends BillboardParticle {
 	};
 
 	private final SpriteProvider sprites;
+	private static final float INSIDE_SOLID_KILL_CHANCE = readFloatProperty("darude.client.inside_solid_kill_chance", 0.35f);
 
 	private SandstormStreakParticle(
 		ClientWorld world,
@@ -48,6 +50,11 @@ public final class SandstormStreakParticle extends BillboardParticle {
 	public void tick() {
 		super.tick();
 		if (!this.dead) {
+			if (INSIDE_SOLID_KILL_CHANCE > 0.0f && isInsideSolid() && this.random.nextFloat() < INSIDE_SOLID_KILL_CHANCE) {
+				this.markDead();
+				return;
+			}
+
 			this.updateSprite(this.sprites);
 		}
 	}
@@ -80,6 +87,24 @@ public final class SandstormStreakParticle extends BillboardParticle {
 			} catch (IllegalAccessException ignored) {
 				return;
 			}
+		}
+	}
+
+	private boolean isInsideSolid() {
+		BlockPos pos = BlockPos.ofFloored(this.x, this.y, this.z);
+		return !this.world.getBlockState(pos).isAir() && this.world.getFluidState(pos).isEmpty();
+	}
+
+	private static float readFloatProperty(String key, float fallback) {
+		String value = System.getProperty(key);
+		if (value == null) {
+			return fallback;
+		}
+
+		try {
+			return Math.max(0.0f, Math.min(1.0f, Float.parseFloat(value)));
+		} catch (NumberFormatException ignored) {
+			return fallback;
 		}
 	}
 
