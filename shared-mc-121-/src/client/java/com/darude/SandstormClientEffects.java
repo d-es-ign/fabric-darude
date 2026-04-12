@@ -9,6 +9,7 @@ import net.minecraft.util.math.random.Random;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.fluid.Fluids;
+import net.minecraft.block.BlockState;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.util.Identifier;
@@ -32,6 +33,7 @@ public final class SandstormClientEffects {
 	private static final int DEFAULT_PARTICLE_MAX_Y = 100;
 	private static final double ABOVE_TERRAIN_TAPER_RANGE = 32.0;
 	private static final double HIGH_ALTITUDE_TAPER_RANGE = 24.0;
+	private static final double OCCLUSION_SAMPLE_Y_OFFSET = 1.2;
 	private static final int WIND_SHIFT_TICKS = 20 * 10;
 	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -91,7 +93,13 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier * PARTICLE_DENSITY_BOOST * (float) altitudeTaper);
+		OcclusionQuality occlusionQuality = resolveOcclusionQuality(client);
+		double occlusionFactor = computeDirectionalOcclusion(world, origin, blendedWindX, blendedWindZ, occlusionQuality);
+		if (occlusionFactor <= 0.0) {
+			return;
+		}
+
+		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier * PARTICLE_DENSITY_BOOST * (float) altitudeTaper * (float) occlusionFactor);
 		particleCount = Math.min(particleCount, tuning.maxPerTick);
 		if (particleCount <= 0) {
 			return;
@@ -156,6 +164,84 @@ public final class SandstormClientEffects {
 		return Math.min(world.getTopYInclusive(), DEFAULT_PARTICLE_MAX_Y);
 	}
 
+	private static double computeDirectionalOcclusion(ClientWorld world, Vec3d origin, double windX, double windZ, OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 1.0;
+		}
+
+		double magnitude = Math.sqrt(windX * windX + windZ * windZ);
+		if (magnitude < 1.0e-4) {
+			return 1.0;
+		}
+
+		double dirX = windX / magnitude;
+		double dirZ = windZ / magnitude;
+		double perpX = -dirZ;
+		double perpZ = dirX;
+		double[] laneOffsets = quality == OcclusionQuality.FANCY ? new double[]{-4.0, -2.0, 0.0, 2.0, 4.0} : new double[]{-2.0, 0.0, 2.0};
+		double[] forwardSamples = quality == OcclusionQuality.FANCY ? new double[]{4.0, 8.0, 12.0, 16.0, 20.0, 24.0} : new double[]{6.0, 12.0, 18.0};
+
+		int blockedSamples = 0;
+		int totalSamples = 0;
+		for (double laneOffset : laneOffsets) {
+			for (double forwardDistance : forwardSamples) {
+				totalSamples++;
+				double sampleX = origin.x + dirX * forwardDistance + perpX * laneOffset;
+				double sampleY = origin.y + OCCLUSION_SAMPLE_Y_OFFSET;
+				double sampleZ = origin.z + dirZ * forwardDistance + perpZ * laneOffset;
+				BlockPos samplePos = BlockPos.ofFloored(sampleX, sampleY, sampleZ);
+				if (isSolidOccluder(world, samplePos)) {
+					blockedSamples++;
+				}
+			}
+		}
+
+		if (totalSamples == 0) {
+			return 1.0;
+		}
+
+		double blockedRatio = blockedSamples / (double) totalSamples;
+		if (blockedRatio >= 0.9) {
+			return 0.0;
+		}
+
+		return Math.max(0.0, 1.0 - blockedRatio);
+	}
+
+	private static boolean isSolidOccluder(ClientWorld world, BlockPos pos) {
+		BlockState state = world.getBlockState(pos);
+		if (state.isAir()) {
+			return false;
+		}
+
+		if (!world.getFluidState(pos).isEmpty()) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private static OcclusionQuality resolveOcclusionQuality(MinecraftClient client) {
+		Object cloudsOption = invokeAny(client.options, "getCloudRenderMode", "cloudStatus");
+		Object cloudsValue = invokeAny(cloudsOption, "getValue", "get");
+		if (cloudsValue instanceof Enum<?> valueEnum) {
+			String name = valueEnum.name();
+			if ("OFF".equals(name)) {
+				return OcclusionQuality.OFF;
+			}
+
+			if ("FAST".equals(name)) {
+				return OcclusionQuality.FAST;
+			}
+
+			if ("FANCY".equals(name)) {
+				return OcclusionQuality.FANCY;
+			}
+		}
+
+		return OcclusionQuality.FAST;
+	}
+
 	private static boolean isAmplifiedWorld(ClientWorld world) {
 		Boolean cached = AMPLIFIED_WORLD_CACHE.get(world);
 		if (cached != null) {
@@ -208,6 +294,12 @@ public final class SandstormClientEffects {
 		}
 
 		return value.toString().toLowerCase().contains("amplified");
+	}
+
+	private enum OcclusionQuality {
+		OFF,
+		FAST,
+		FANCY
 	}
 
 	private static void updateWindDirection(ClientWorld world, Random random) {
