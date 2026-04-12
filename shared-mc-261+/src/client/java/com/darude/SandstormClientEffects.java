@@ -36,6 +36,9 @@ public final class SandstormClientEffects {
 	private static final double OCCLUSION_SAMPLE_Y_OFFSET = 1.2;
 	private static final double WALL_MASK_DISTANCE = readDoubleProperty("darude.client.wall_mask_distance", 1.5);
 	private static final double OCCLUSION_STRENGTH = clamp01(readDoubleProperty("darude.client.occlusion_strength", 0.75));
+	private static final int OFF_MIN_PARTICLES_PER_SPAWN = 3;
+	private static final int FAST_MIN_PARTICLES_PER_SPAWN = 6;
+	private static final int FANCY_MIN_PARTICLES_PER_SPAWN = 10;
 	private static final int WIND_SHIFT_TICKS = 20 * 10;
 	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -79,9 +82,15 @@ public final class SandstormClientEffects {
 		float rainGradient = world.getRainLevel(1.0f);
  
 		ParticleTuning tuning = getParticleTuning(client);
-		if (world.getGameTime() % tuning.intervalTicks != 0) {
+		OcclusionQuality occlusionQuality = resolveOcclusionQuality(client);
+		int effectiveIntervalTicks = Math.max(1, Math.round(tuning.intervalTicks * qualityIntervalMultiplier(occlusionQuality)));
+		if (world.getGameTime() % effectiveIntervalTicks != 0) {
 			return;
 		}
+
+		float blendProgress = Math.min(1.0f, (world.getGameTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS);
+		double blendedWindX = lerp(previousWindDirection.getStepX(), windDirection.getStepX(), blendProgress);
+		double blendedWindZ = lerp(previousWindDirection.getStepZ(), windDirection.getStepZ(), blendProgress);
 
 		int particleMinY = Math.max(world.getMinY(), PARTICLE_MIN_Y);
 		int particleMaxY = resolveParticleMaxY(world);
@@ -95,31 +104,37 @@ public final class SandstormClientEffects {
 			return;
 		}
 
-		OcclusionQuality occlusionQuality = resolveOcclusionQuality(client);
 		double occlusionFactor = computeDirectionalOcclusion(world, origin, blendedWindX, blendedWindZ, occlusionQuality);
 		if (occlusionFactor <= 0.0) {
 			return;
 		}
 
-		int particleCount = Math.round((30 + 90.0f * rainGradient) * tuning.densityMultiplier * PARTICLE_DENSITY_BOOST * (float) altitudeTaper * (float) occlusionFactor);
-		particleCount = Math.min(particleCount, tuning.maxPerTick);
+		int particleCount = Math.round((30 + 90.0f * rainGradient)
+			* tuning.densityMultiplier
+			* PARTICLE_DENSITY_BOOST
+			* qualityDensityMultiplier(occlusionQuality)
+			* (float) altitudeTaper
+			* (float) occlusionFactor);
+		int qualityMaxPerTick = Math.max(1, Math.round(tuning.maxPerTick * qualityMaxPerTickMultiplier(occlusionQuality)));
+		particleCount = Math.min(particleCount, qualityMaxPerTick);
+		particleCount = Math.max(particleCount, qualityMinParticles(occlusionQuality));
 		if (particleCount <= 0) {
 			return;
 		}
 
-		float blendProgress = Math.min(1.0f, (world.getGameTime() - windBlendStartTick) / (float) WIND_BLEND_TICKS);
-		double blendedWindX = lerp(previousWindDirection.getStepX(), windDirection.getStepX(), blendProgress);
-		double blendedWindZ = lerp(previousWindDirection.getStepZ(), windDirection.getStepZ(), blendProgress);
-
 		double baseVx = blendedWindX;
 		double baseVz = blendedWindZ;
+		double spawnRadius = PARTICLE_SPAWN_RADIUS * qualitySpawnRadiusMultiplier(occlusionQuality);
+		double verticalSpan = qualityVerticalSpan(occlusionQuality);
+		double qualityJitter = HORIZONTAL_JITTER * qualityJitterMultiplier(occlusionQuality);
+		double speedMultiplier = qualitySpeedMultiplier(occlusionQuality);
 
 		for (int i = 0; i < particleCount; i++) {
-			double xOffset = (random.nextDouble() - 0.5) * (PARTICLE_SPAWN_RADIUS * 2.0) - blendedWindX * UPWIND_SPAWN_BIAS;
-			double zOffset = (random.nextDouble() - 0.5) * (PARTICLE_SPAWN_RADIUS * 2.0) - blendedWindZ * UPWIND_SPAWN_BIAS;
+			double xOffset = (random.nextDouble() - 0.5) * (spawnRadius * 2.0) - blendedWindX * UPWIND_SPAWN_BIAS;
+			double zOffset = (random.nextDouble() - 0.5) * (spawnRadius * 2.0) - blendedWindZ * UPWIND_SPAWN_BIAS;
 
 			double x = origin.x + xOffset;
-			double y = origin.y + (random.nextDouble() - 0.5) * 24.0;
+			double y = origin.y + (random.nextDouble() - 0.5) * verticalSpan;
 			double z = origin.z + zOffset;
 			if (y < particleMinY || y > particleMaxY) {
 				continue;
@@ -135,10 +150,10 @@ public final class SandstormClientEffects {
 				continue;
 			}
 
-			double horizontalSpeed = MIN_HORIZONTAL_SPEED + random.nextDouble() * (MAX_HORIZONTAL_SPEED - MIN_HORIZONTAL_SPEED);
-			double vx = baseVx * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
+			double horizontalSpeed = (MIN_HORIZONTAL_SPEED + random.nextDouble() * (MAX_HORIZONTAL_SPEED - MIN_HORIZONTAL_SPEED)) * speedMultiplier;
+			double vx = baseVx * horizontalSpeed + (random.nextDouble() - 0.5) * qualityJitter;
 			double vy = STREAK_VERTICAL_VELOCITY;
-			double vz = baseVz * horizontalSpeed + (random.nextDouble() - 0.5) * HORIZONTAL_JITTER;
+			double vz = baseVz * horizontalSpeed + (random.nextDouble() - 0.5) * qualityJitter;
 
 			world.addParticle(DarudeParticles.SANDSTORM_STREAK, x, y, z, vx * STREAK_SPEED_MULTIPLIER, vy, vz * STREAK_SPEED_MULTIPLIER);
 		}
@@ -327,6 +342,102 @@ public final class SandstormClientEffects {
 		}
 
 		return value.toString().toLowerCase().contains("amplified");
+	}
+
+	private static float qualityIntervalMultiplier(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 3.0f;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 1.5f;
+		}
+
+		return 1.0f;
+	}
+
+	private static float qualityDensityMultiplier(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 0.35f;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 0.7f;
+		}
+
+		return 1.0f;
+	}
+
+	private static float qualityMaxPerTickMultiplier(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 0.35f;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 0.7f;
+		}
+
+		return 1.0f;
+	}
+
+	private static int qualityMinParticles(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return OFF_MIN_PARTICLES_PER_SPAWN;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return FAST_MIN_PARTICLES_PER_SPAWN;
+		}
+
+		return FANCY_MIN_PARTICLES_PER_SPAWN;
+	}
+
+	private static float qualitySpawnRadiusMultiplier(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 0.65f;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 0.85f;
+		}
+
+		return 1.0f;
+	}
+
+	private static double qualityVerticalSpan(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 16.0;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 20.0;
+		}
+
+		return 24.0;
+	}
+
+	private static float qualityJitterMultiplier(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 0.6f;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 0.85f;
+		}
+
+		return 1.0f;
+	}
+
+	private static float qualitySpeedMultiplier(OcclusionQuality quality) {
+		if (quality == OcclusionQuality.OFF) {
+			return 0.85f;
+		}
+
+		if (quality == OcclusionQuality.FAST) {
+			return 0.95f;
+		}
+
+		return 1.0f;
 	}
 
 	private static double readDoubleProperty(String key, double fallback) {
