@@ -39,6 +39,7 @@ public final class SandstormClientEffects {
 	private static final int OFF_MIN_PARTICLES_PER_SPAWN = 3;
 	private static final int FAST_MIN_PARTICLES_PER_SPAWN = 6;
 	private static final int FANCY_MIN_PARTICLES_PER_SPAWN = 10;
+	private static final float THUNDERSTORM_VISUAL_INTENSITY = 1.5f;
 	private static final int WIND_SHIFT_TICKS = 20 * 10;
 	private static final int WIND_BLEND_TICKS = 10;
 	private static final int BASE_PARTICLE_INTERVAL_TICKS = 3;
@@ -80,6 +81,7 @@ public final class SandstormClientEffects {
 		updateWindDirection(world, random);
 
 		float rainGradient = world.getRainLevel(1.0f);
+		float visualIntensity = getVisualIntensity(world);
  
 		ParticleTuning tuning = getParticleTuning(client);
 		OcclusionQuality occlusionQuality = resolveOcclusionQuality(client);
@@ -113,7 +115,8 @@ public final class SandstormClientEffects {
 			* tuning.densityMultiplier
 			* PARTICLE_DENSITY_BOOST
 			* (float) altitudeTaper
-			* (float) occlusionFactor);
+			* (float) occlusionFactor
+			* visualIntensity);
 		particleCount = Math.min(particleCount, tuning.maxPerTick);
 		particleCount = Math.max(particleCount, tuning.minPerSpawn);
 		if (particleCount <= 0) {
@@ -523,6 +526,19 @@ public final class SandstormClientEffects {
 
 	public static float getAnimatedFogEnd(Minecraft client) {
 		return SANDSTORM_FOG_END;
+	}
+
+	public static float getVisualIntensity(Minecraft client) {
+		ClientLevel world = client.level;
+		if (world == null || !isSandstormActive(client)) {
+			return 0.0f;
+		}
+
+		return getVisualIntensity(world);
+	}
+
+	private static float getVisualIntensity(ClientLevel world) {
+		return world.isThundering() ? THUNDERSTORM_VISUAL_INTENSITY : 1.0f;
 	}
 
 	private static String getParticleModeName(Minecraft client) {

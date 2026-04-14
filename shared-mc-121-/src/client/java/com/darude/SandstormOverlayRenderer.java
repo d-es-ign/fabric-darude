@@ -30,7 +30,7 @@ public final class SandstormOverlayRenderer {
 
 	public static void render(DrawContext drawContext, MinecraftClient client) {
 		OverlayQuality quality = resolveOverlayQuality(client);
-		float targetStrength = SandstormClientEffects.isSandstormActive(client) ? 1.0f : 0.0f;
+		float targetStrength = SandstormClientEffects.getVisualIntensity(client);
 		overlayStrength = moveTowards(overlayStrength, targetStrength, OVERLAY_FADE_STEP * quality.fadeMultiplier);
 		if (overlayStrength <= 0.001f) {
 			return;

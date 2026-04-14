@@ -42,6 +42,7 @@ public final class SandLayerFarmingService {
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
 	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
+	private static final float THUNDERSTORM_FARMING_MULTIPLIER = 2.5f;
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> FARMING_EMITTERS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
@@ -80,6 +81,8 @@ public final class SandLayerFarmingService {
 			return;
 		}
 
+		int farmingOperationLimit = resolveFarmingOperationLimit(world, config);
+
 		Direction windDirection = SandstormWindService.getWindDirection(world);
 		Random random = world.getRandom();
 		Set<Long> scannedChunks = collectCandidateChunks(world);
@@ -87,7 +90,7 @@ public final class SandLayerFarmingService {
 		Map<Long, Boolean> chunkBiomeCache = new HashMap<>();
 		int[] operationsUsed = new int[]{0};
 		int[] verticalChecksUsed = new int[]{0};
-		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, config.maxFarmingOperationsPerTick() * 32);
+		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, farmingOperationLimit * 32);
 		int emitterMaxY = resolveEmitterMaxY(world);
 		long startedAtNanos = System.nanoTime();
 		long deadlineNanos = startedAtNanos + MAX_FARMING_WORK_NANOS;
@@ -97,7 +100,7 @@ public final class SandLayerFarmingService {
 				break;
 			}
 
-			if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
+			if (operationsUsed[0] >= farmingOperationLimit) {
 				break;
 			}
 
@@ -108,7 +111,7 @@ public final class SandLayerFarmingService {
 				continue;
 			}
 
-			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, maxVerticalChecks, deadlineNanos, emitterMaxY);
+			scanChunk(world, worldChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, farmingOperationLimit, maxVerticalChecks, deadlineNanos, emitterMaxY);
 		}
 
 		if (System.nanoTime() >= deadlineNanos && Boolean.getBoolean("darude.debug.hotspots")) {
@@ -174,6 +177,15 @@ public final class SandLayerFarmingService {
 		}
 
 		return Math.min(world.getTopYInclusive(), DEFAULT_EMITTER_MAX_Y);
+	}
+
+	private static int resolveFarmingOperationLimit(ServerWorld world, SandLayerGenerationConfig.Values config) {
+		int baseLimit = config.maxFarmingOperationsPerTick();
+		if (!world.isThundering()) {
+			return baseLimit;
+		}
+
+		return Math.max(baseLimit + 1, Math.round(baseLimit * THUNDERSTORM_FARMING_MULTIPLIER));
 	}
 
 	private static boolean isAmplifiedWorld(ServerWorld world) {
@@ -243,6 +255,7 @@ public final class SandLayerFarmingService {
 		Map<Long, Boolean> chunkBiomeCache,
 		int[] operationsUsed,
 		int[] verticalChecksUsed,
+		int farmingOperationLimit,
 		int maxVerticalChecks,
 		long deadlineNanos,
 		int emitterMaxY
@@ -258,7 +271,7 @@ public final class SandLayerFarmingService {
 					return;
 				}
 
-				if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
+				if (operationsUsed[0] >= farmingOperationLimit) {
 					return;
 				}
 
@@ -283,7 +296,7 @@ public final class SandLayerFarmingService {
 						return;
 					}
 
-					if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
+					if (operationsUsed[0] >= farmingOperationLimit) {
 						return;
 					}
 
@@ -293,7 +306,7 @@ public final class SandLayerFarmingService {
 						continue;
 					}
 
-					processEmitterAt(world, emitterPos, config, windDirection, random, biomeCache, operationsUsed, 0);
+					processEmitterAt(world, emitterPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, 0);
 				}
 			}
 		}
@@ -322,13 +335,14 @@ public final class SandLayerFarmingService {
 		Random random,
 		Map<Long, Boolean> biomeCache,
 		int[] operationsUsed,
+		int farmingOperationLimit,
 		int depth
 	) {
 		if (depth > config.maxFallthroughDepth()) {
 			return false;
 		}
 
-		if (operationsUsed[0] >= config.maxFarmingOperationsPerTick()) {
+		if (operationsUsed[0] >= farmingOperationLimit) {
 			return false;
 		}
 		operationsUsed[0]++;
@@ -345,7 +359,7 @@ public final class SandLayerFarmingService {
 			if (random.nextFloat() >= config.baseUnderGrateChance()) {
 				return false;
 			}
-			return attemptPlacementWithFallthrough(world, emitterPos.down(), config, windDirection, random, biomeCache, operationsUsed, depth);
+			return attemptPlacementWithFallthrough(world, emitterPos.down(), config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth);
 		}
 
 		boolean generated = false;
@@ -366,7 +380,7 @@ public final class SandLayerFarmingService {
 			}
 
 			BlockPos sideTarget = supportPos.offset(direction);
-			if (attemptPlacementWithFallthrough(world, sideTarget, config, windDirection, random, biomeCache, operationsUsed, depth)) {
+			if (attemptPlacementWithFallthrough(world, sideTarget, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth)) {
 				generated = true;
 			}
 		}
@@ -386,6 +400,7 @@ public final class SandLayerFarmingService {
 		Random random,
 		Map<Long, Boolean> biomeCache,
 		int[] operationsUsed,
+		int farmingOperationLimit,
 		int depth
 	) {
 		if (depth > config.maxFallthroughDepth()) {
@@ -394,7 +409,7 @@ public final class SandLayerFarmingService {
 
 		BlockState state = world.getBlockState(targetPos);
 		if (state.isIn(FARMING_EMITTERS)) {
-			return processEmitterAt(world, targetPos, config, windDirection, random, biomeCache, operationsUsed, depth + 1);
+			return processEmitterAt(world, targetPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth + 1);
 		}
 
 		if (state.isAir()) {
