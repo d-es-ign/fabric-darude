@@ -68,15 +68,15 @@ public final class SandstormOverlayRenderer {
 	}
 
 	private static OverlayQuality resolveOverlayQuality(Minecraft client) {
-		Object cloudOption = invokeAny(client.options, "cloudStatus", "getCloudRenderMode");
-		Object cloudValue = invokeAny(cloudOption, "get", "getValue");
-		if (cloudValue instanceof Enum<?> cloudEnum) {
-			String name = cloudEnum.name();
-			if ("OFF".equals(name)) {
+		Object graphicsOption = invokeAny(client.options, "graphicsMode", "getGraphicsMode");
+		Object graphicsValue = invokeAny(graphicsOption, "get", "getValue");
+		if (graphicsValue instanceof Enum<?> graphicsEnum) {
+			String name = graphicsEnum.name();
+			if ("FAST".equals(name)) {
 				return OverlayQuality.OFF;
 			}
 
-			if ("FAST".equals(name)) {
+			if ("FANCY".equals(name)) {
 				return OverlayQuality.FAST;
 			}
 		}

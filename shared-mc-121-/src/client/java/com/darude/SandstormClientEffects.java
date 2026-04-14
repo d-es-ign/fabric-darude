@@ -83,7 +83,7 @@ public final class SandstormClientEffects {
  
 		ParticleTuning tuning = getParticleTuning(client);
 		OcclusionQuality occlusionQuality = resolveOcclusionQuality(client);
-		int effectiveIntervalTicks = Math.max(1, Math.round(tuning.intervalTicks * qualityIntervalMultiplier(occlusionQuality)));
+		int effectiveIntervalTicks = tuning.intervalTicks;
 		if (world.getTime() % effectiveIntervalTicks != 0) {
 			return;
 		}
@@ -112,22 +112,20 @@ public final class SandstormClientEffects {
 		int particleCount = Math.round((30 + 90.0f * rainGradient)
 			* tuning.densityMultiplier
 			* PARTICLE_DENSITY_BOOST
-			* qualityDensityMultiplier(occlusionQuality)
 			* (float) altitudeTaper
 			* (float) occlusionFactor);
-		int qualityMaxPerTick = Math.max(1, Math.round(tuning.maxPerTick * qualityMaxPerTickMultiplier(occlusionQuality)));
-		particleCount = Math.min(particleCount, qualityMaxPerTick);
-		particleCount = Math.max(particleCount, qualityMinParticles(occlusionQuality));
+		particleCount = Math.min(particleCount, tuning.maxPerTick);
+		particleCount = Math.max(particleCount, tuning.minPerSpawn);
 		if (particleCount <= 0) {
 			return;
 		}
 
 		double baseVx = blendedWindX;
 		double baseVz = blendedWindZ;
-		double spawnRadius = PARTICLE_SPAWN_RADIUS * qualitySpawnRadiusMultiplier(occlusionQuality);
-		double verticalSpan = qualityVerticalSpan(occlusionQuality);
-		double qualityJitter = HORIZONTAL_JITTER * qualityJitterMultiplier(occlusionQuality);
-		double speedMultiplier = qualitySpeedMultiplier(occlusionQuality);
+		double spawnRadius = PARTICLE_SPAWN_RADIUS * resolveRenderDistanceMultiplier(client);
+		double verticalSpan = tuning.verticalSpan;
+		double qualityJitter = HORIZONTAL_JITTER;
+		double speedMultiplier = 1.0;
 
 		for (int i = 0; i < particleCount; i++) {
 			double xOffset = (random.nextDouble() - 0.5) * (spawnRadius * 2.0) - blendedWindX * UPWIND_SPAWN_BIAS;
@@ -270,24 +268,20 @@ public final class SandstormClientEffects {
 	}
 
 	private static OcclusionQuality resolveOcclusionQuality(MinecraftClient client) {
-		Object cloudsOption = invokeAny(client.options, "getCloudRenderMode", "cloudStatus");
-		Object cloudsValue = invokeAny(cloudsOption, "getValue", "get");
-		if (cloudsValue instanceof Enum<?> valueEnum) {
+		Object graphicsOption = invokeAny(client.options, "getGraphicsMode", "graphicsMode");
+		Object graphicsValue = invokeAny(graphicsOption, "getValue", "get");
+		if (graphicsValue instanceof Enum<?> valueEnum) {
 			String name = valueEnum.name();
-			if ("OFF".equals(name)) {
-				return OcclusionQuality.OFF;
-			}
-
 			if ("FAST".equals(name)) {
 				return OcclusionQuality.FAST;
 			}
 
-			if ("FANCY".equals(name)) {
+			if ("FANCY".equals(name) || "FABULOUS".equals(name)) {
 				return OcclusionQuality.FANCY;
 			}
 		}
 
-		return OcclusionQuality.FAST;
+		return OcclusionQuality.OFF;
 	}
 
 	private static boolean isAmplifiedWorld(ClientWorld world) {
@@ -344,100 +338,36 @@ public final class SandstormClientEffects {
 		return value.toString().toLowerCase().contains("amplified");
 	}
 
-	private static float qualityIntervalMultiplier(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 3.0f;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
-			return 1.5f;
-		}
-
-		return 1.0f;
-	}
-
-	private static float qualityDensityMultiplier(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 0.35f;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
+	private static float resolveRenderDistanceMultiplier(MinecraftClient client) {
+		int renderDistance = resolveRenderDistance(client);
+		if (renderDistance <= 8) {
 			return 0.7f;
 		}
 
-		return 1.0f;
-	}
-
-	private static float qualityMaxPerTickMultiplier(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 0.35f;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
-			return 0.7f;
-		}
-
-		return 1.0f;
-	}
-
-	private static int qualityMinParticles(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return OFF_MIN_PARTICLES_PER_SPAWN;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
-			return FAST_MIN_PARTICLES_PER_SPAWN;
-		}
-
-		return FANCY_MIN_PARTICLES_PER_SPAWN;
-	}
-
-	private static float qualitySpawnRadiusMultiplier(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 0.65f;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
+		if (renderDistance <= 12) {
 			return 0.85f;
 		}
 
-		return 1.0f;
+		if (renderDistance <= 20) {
+			return 1.0f;
+		}
+
+		return 1.15f;
 	}
 
-	private static double qualityVerticalSpan(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 16.0;
+	private static int resolveRenderDistance(MinecraftClient client) {
+		Object renderDistanceOption = invokeAny(client.options, "getViewDistance", "viewDistance", "getClampedViewDistance");
+		Object renderDistanceValue = invokeAny(renderDistanceOption, "getValue", "get");
+		if (renderDistanceValue instanceof Number number) {
+			return number.intValue();
 		}
 
-		if (quality == OcclusionQuality.FAST) {
-			return 20.0;
+		Object directValue = invokeAny(client.options, "getClampedViewDistance");
+		if (directValue instanceof Number number) {
+			return number.intValue();
 		}
 
-		return 24.0;
-	}
-
-	private static float qualityJitterMultiplier(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 0.6f;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
-			return 0.85f;
-		}
-
-		return 1.0f;
-	}
-
-	private static float qualitySpeedMultiplier(OcclusionQuality quality) {
-		if (quality == OcclusionQuality.OFF) {
-			return 0.85f;
-		}
-
-		if (quality == OcclusionQuality.FAST) {
-			return 0.95f;
-		}
-
-		return 1.0f;
+		return 12;
 	}
 
 	private static double readDoubleProperty(String key, double fallback) {
@@ -494,18 +424,18 @@ public final class SandstormClientEffects {
 		if (mode instanceof Enum<?> modeEnum) {
 			String name = modeEnum.name();
 			if ("MINIMAL".equals(name)) {
-				return new ParticleTuning(0.2f, BASE_PARTICLE_INTERVAL_TICKS * 3, 12);
+				return new ParticleTuning(0.2f, BASE_PARTICLE_INTERVAL_TICKS * 3, 12, OFF_MIN_PARTICLES_PER_SPAWN, 16.0);
 			}
 
 			if ("DECREASED".equals(name)) {
-				return new ParticleTuning(0.5f, BASE_PARTICLE_INTERVAL_TICKS * 2, 24);
+				return new ParticleTuning(0.5f, BASE_PARTICLE_INTERVAL_TICKS * 2, 24, FAST_MIN_PARTICLES_PER_SPAWN, 20.0);
 			}
 		}
 
-		return new ParticleTuning(1.0f, BASE_PARTICLE_INTERVAL_TICKS, BASE_MAX_PARTICLES_PER_TICK);
+		return new ParticleTuning(1.0f, BASE_PARTICLE_INTERVAL_TICKS, BASE_MAX_PARTICLES_PER_TICK, FANCY_MIN_PARTICLES_PER_SPAWN, 24.0);
 	}
 
-	private record ParticleTuning(float densityMultiplier, int intervalTicks, int maxPerTick) {
+	private record ParticleTuning(float densityMultiplier, int intervalTicks, int maxPerTick, int minPerSpawn, double verticalSpan) {
 	}
 
 	private static void syncWindWorld(ClientWorld world) {
@@ -584,6 +514,8 @@ public final class SandstormClientEffects {
 		lines.add("Wind Dir: " + windDirection.asString());
 		lines.add(String.format("Wind Transition: %.2f", windProgress));
 		lines.add("Particle Mode: " + getParticleModeName(client));
+		lines.add("Graphics Mode: " + getGraphicsModeName(client));
+		lines.add("Render Distance: " + resolveRenderDistance(client));
 		lines.add("Particle Budget: " + Math.max(0, particleBudget) + " (cap=" + tuning.maxPerTick + ", interval=" + tuning.intervalTicks + "t)");
 		lines.add(String.format("Fog Start/End: %.1f / %.1f", getAnimatedFogStart(client), getAnimatedFogEnd(client)));
 
@@ -602,6 +534,16 @@ public final class SandstormClientEffects {
 		Object mode = client.options.getParticles().getValue();
 		if (mode instanceof Enum<?> modeEnum) {
 			return modeEnum.name();
+		}
+
+		return "UNKNOWN";
+	}
+
+	private static String getGraphicsModeName(MinecraftClient client) {
+		Object graphicsOption = invokeAny(client.options, "getGraphicsMode", "graphicsMode");
+		Object graphicsValue = invokeAny(graphicsOption, "getValue", "get");
+		if (graphicsValue instanceof Enum<?> graphicsEnum) {
+			return graphicsEnum.name();
 		}
 
 		return "UNKNOWN";
