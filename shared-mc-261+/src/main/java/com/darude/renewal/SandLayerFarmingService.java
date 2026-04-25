@@ -61,6 +61,7 @@ public final class SandLayerFarmingService {
 	private static boolean farmingEmitterFallbackLogged;
 	private static final WeakHashMap<ServerLevel, Boolean> AMPLIFIED_WORLD_CACHE = new WeakHashMap<>();
 	private static final WeakHashMap<ServerLevel, Map<Long, ChunkEmitterCache>> CHUNK_EMITTER_CACHE = new WeakHashMap<>();
+	private static final WeakHashMap<ServerLevel, FarmingDebugStats> LAST_FARMING_DEBUG_STATS = new WeakHashMap<>();
 
 	private SandLayerFarmingService() {
 	}
@@ -79,6 +80,8 @@ public final class SandLayerFarmingService {
 			Commands.literal("darude")
 				.then(Commands.literal("debug_farming_emitters")
 					.executes(context -> runDebugFarmingEmitters(context.getSource())))
+				.then(Commands.literal("debug_farming_stats")
+					.executes(context -> runDebugFarmingStats(context.getSource())))
 				.then(Commands.literal("debug_farming_emitter_tag")
 					.executes(context -> runDebugFarmingEmitterTag(context.getSource())))
 				.then(Commands.literal("locate_farming_emitters")
@@ -144,6 +147,10 @@ public final class SandLayerFarmingService {
 		int[] operationsUsed = new int[]{0};
 		int[] verticalChecksUsed = new int[]{0};
 		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, farmingOperationLimit * 32);
+		FarmingDebugStats stats = new FarmingDebugStats();
+		stats.scannedChunks = scannedChunks.size();
+		stats.farmingOperationLimit = farmingOperationLimit;
+		stats.maxVerticalChecks = maxVerticalChecks;
 		int emitterMaxY = resolveEmitterMaxY(world);
 		long startedAtNanos = System.nanoTime();
 		long deadlineNanos = startedAtNanos + MAX_FARMING_WORK_NANOS;
@@ -164,8 +171,16 @@ public final class SandLayerFarmingService {
 				continue;
 			}
 
-			scanChunk(world, levelChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, farmingOperationLimit, maxVerticalChecks, deadlineNanos, emitterMaxY);
+			scanChunk(world, levelChunk, config, windDirection, random, biomeCache, chunkBiomeCache, operationsUsed, verticalChecksUsed, farmingOperationLimit, maxVerticalChecks, deadlineNanos, emitterMaxY, stats);
 		}
+
+		stats.operationsUsed = operationsUsed[0];
+		stats.verticalChecksUsed = verticalChecksUsed[0];
+		stats.deadlineHit = System.nanoTime() >= deadlineNanos;
+		stats.raining = true;
+		stats.randomTickSpeed = randomTickSpeed;
+		stats.effectiveIntervalTicks = effectiveIntervalTicks;
+		LAST_FARMING_DEBUG_STATS.put(world, stats);
 
 		if (System.nanoTime() >= deadlineNanos && Boolean.getBoolean("darude.debug.hotspots")) {
 			DarudeMod.LOGGER.warn("Hotspot[farming-budget] world={} exhausted {} ms budget", world.dimension(), MAX_FARMING_WORK_NANOS / 1_000_000L);
@@ -270,6 +285,16 @@ public final class SandLayerFarmingService {
 
 	private static int runDebugFarmingEmitterTag(CommandSourceStack source) {
 		String summary = buildKnownEmitterTagSummary();
+		source.sendSuccess(() -> Component.literal(summary), false);
+		return 1;
+	}
+
+	private static int runDebugFarmingStats(CommandSourceStack source) {
+		ServerLevel world = source.getLevel();
+		FarmingDebugStats stats = LAST_FARMING_DEBUG_STATS.get(world);
+		String summary = stats == null
+			? "No farming tick stats recorded yet for this world"
+			: stats.toSummary();
 		source.sendSuccess(() -> Component.literal(summary), false);
 		return 1;
 	}
@@ -580,7 +605,8 @@ public final class SandLayerFarmingService {
 		int farmingOperationLimit,
 		int maxVerticalChecks,
 		long deadlineNanos,
-		int emitterMaxY
+		int emitterMaxY,
+		FarmingDebugStats stats
 	) {
 		ChunkPos chunkPos = chunk.getPos();
 		if (!isChunkInSandstormBiome(world, chunkPos, chunkBiomeCache)) {
@@ -588,6 +614,7 @@ public final class SandLayerFarmingService {
 		}
 
 		ChunkEmitterCache emitterCache = getChunkEmitterCache(world, chunk, biomeCache, emitterMaxY, operationsUsed, farmingOperationLimit, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
+		stats.cachedEmitters += emitterCache.emitterPositions.size();
 		if (emitterCache.emitterPositions.isEmpty()) {
 			return;
 		}
@@ -601,11 +628,13 @@ public final class SandLayerFarmingService {
 				return;
 			}
 
+			stats.emittersVisited++;
+
 			if (!isEmitterBlock(world.getBlockState(emitterPos))) {
 				continue;
 			}
 
-			processEmitterAt(world, emitterPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, 0);
+			processEmitterAt(world, emitterPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, 0, stats);
 		}
 	}
 
@@ -735,7 +764,8 @@ public final class SandLayerFarmingService {
 		Map<Long, Boolean> biomeCache,
 		int[] operationsUsed,
 		int farmingOperationLimit,
-		int depth
+		int depth,
+		FarmingDebugStats stats
 	) {
 		if (depth > config.maxFallthroughDepth()) {
 			return false;
@@ -749,6 +779,7 @@ public final class SandLayerFarmingService {
 		if (!isQualifiedEmitter(world, emitterPos, biomeCache)) {
 			return false;
 		}
+		stats.qualifiedEmitters++;
 
 		BlockPos supportPos = emitterPos.below();
 		BlockState supportState = world.getBlockState(supportPos);
@@ -758,7 +789,8 @@ public final class SandLayerFarmingService {
 			if (random.nextFloat() >= config.baseUnderGrateChance()) {
 				return false;
 			}
-			return attemptPlacementWithFallthrough(world, emitterPos.below(), config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth);
+			stats.underGrateRollPasses++;
+			return attemptPlacementWithFallthrough(world, emitterPos.below(), config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth, stats);
 		}
 
 		boolean generated = false;
@@ -779,7 +811,7 @@ public final class SandLayerFarmingService {
 			}
 
 			BlockPos sideTarget = supportPos.relative(direction);
-			if (attemptPlacementWithFallthrough(world, sideTarget, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth)) {
+			if (attemptPlacementWithFallthrough(world, sideTarget, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth, stats)) {
 				generated = true;
 			}
 		}
@@ -800,7 +832,8 @@ public final class SandLayerFarmingService {
 		Map<Long, Boolean> biomeCache,
 		int[] operationsUsed,
 		int farmingOperationLimit,
-		int depth
+		int depth,
+		FarmingDebugStats stats
 	) {
 		if (depth > config.maxFallthroughDepth()) {
 			return false;
@@ -808,8 +841,10 @@ public final class SandLayerFarmingService {
 
 		BlockState state = world.getBlockState(targetPos);
 		if (isEmitterBlock(state)) {
-			return processEmitterAt(world, targetPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth + 1);
+			return processEmitterAt(world, targetPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth + 1, stats);
 		}
+
+		stats.placementAttempts++;
 
 		if (state.isAir()) {
 			BlockState layerState = DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, 1);
@@ -818,6 +853,7 @@ public final class SandLayerFarmingService {
 			}
 
 			if (world.setBlock(targetPos, layerState, 3)) {
+				stats.successfulPlacements++;
 				SandLayerAvalancheService.enqueue(world, targetPos);
 				return true;
 			}
@@ -830,6 +866,7 @@ public final class SandLayerFarmingService {
 				? Blocks.SAND.defaultBlockState()
 				: state.setValue(SandLayerBlock.LAYERS, layers + 1);
 			if (world.setBlock(targetPos, next, 3)) {
+				stats.successfulPlacements++;
 				SandLayerAvalancheService.enqueue(world, targetPos);
 				return true;
 			}
@@ -919,5 +956,39 @@ public final class SandLayerFarmingService {
 	}
 
 	private record ChunkEmitterCache(long builtAtTick, int emitterMaxY, List<BlockPos> emitterPositions) {
+	}
+
+	private static final class FarmingDebugStats {
+		private int scannedChunks;
+		private int cachedEmitters;
+		private int emittersVisited;
+		private int qualifiedEmitters;
+		private int underGrateRollPasses;
+		private int placementAttempts;
+		private int successfulPlacements;
+		private int operationsUsed;
+		private int verticalChecksUsed;
+		private int farmingOperationLimit;
+		private int maxVerticalChecks;
+		private int randomTickSpeed;
+		private int effectiveIntervalTicks;
+		private boolean deadlineHit;
+		private boolean raining;
+
+		private String toSummary() {
+			return "chunks=" + scannedChunks
+				+ " cached_emitters=" + cachedEmitters
+				+ " visited=" + emittersVisited
+				+ " qualified=" + qualifiedEmitters
+				+ " grate_roll_passes=" + underGrateRollPasses
+				+ " placement_attempts=" + placementAttempts
+				+ " successes=" + successfulPlacements
+				+ " ops=" + operationsUsed + "/" + farmingOperationLimit
+				+ " vertical_checks=" + verticalChecksUsed + "/" + maxVerticalChecks
+				+ " random_tick_speed=" + randomTickSpeed
+				+ " interval=" + effectiveIntervalTicks
+				+ " raining=" + raining
+				+ " deadline_hit=" + deadlineHit;
+		}
 	}
 }
