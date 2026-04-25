@@ -68,6 +68,8 @@ public final class SandLayerFarmingService {
 			CommandManager.literal("darude")
 				.then(CommandManager.literal("debug_farming_emitters")
 					.executes(context -> runDebugFarmingEmitters(context.getSource())))
+				.then(CommandManager.literal("debug_farming_emitter_tag")
+					.executes(context -> runDebugFarmingEmitterTag(context.getSource())))
 				.then(CommandManager.literal("locate_farming_emitters")
 					.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.getDefaultState(), "Updated ")))
 		));
@@ -258,6 +260,50 @@ public final class SandLayerFarmingService {
 		String summary = prefix + updated + " emitter markers" + buildLocateFailureReason(world, player.getChunkPos(), updated, knownEmitterBlocksInRange);
 		source.sendFeedback(() -> Text.literal(summary), false);
 		return updated;
+	}
+
+	private static int runDebugFarmingEmitterTag(ServerCommandSource source) {
+		String summary = buildKnownEmitterTagSummary();
+		source.sendFeedback(() -> Text.literal(summary), false);
+		return 1;
+	}
+
+	private static String buildKnownEmitterTagSummary() {
+		BlockState[] states = new BlockState[]{
+			Blocks.MANGROVE_ROOTS.getDefaultState(),
+			Blocks.COPPER_GRATE.getDefaultState(),
+			Blocks.EXPOSED_COPPER_GRATE.getDefaultState(),
+			Blocks.WEATHERED_COPPER_GRATE.getDefaultState(),
+			Blocks.OXIDIZED_COPPER_GRATE.getDefaultState(),
+			Blocks.WAXED_COPPER_GRATE.getDefaultState(),
+			Blocks.WAXED_EXPOSED_COPPER_GRATE.getDefaultState(),
+			Blocks.WAXED_WEATHERED_COPPER_GRATE.getDefaultState(),
+			Blocks.WAXED_OXIDIZED_COPPER_GRATE.getDefaultState()
+		};
+		String[] names = new String[]{
+			"mangrove_roots",
+			"copper_grate",
+			"exposed_copper_grate",
+			"weathered_copper_grate",
+			"oxidized_copper_grate",
+			"waxed_copper_grate",
+			"waxed_exposed_copper_grate",
+			"waxed_weathered_copper_grate",
+			"waxed_oxidized_copper_grate"
+		};
+		StringBuilder summary = new StringBuilder("Runtime tag darude:farming_emitters: ");
+		int resolved = 0;
+		for (int i = 0; i < states.length; i++) {
+			boolean inTag = states[i].isIn(FARMING_EMITTERS);
+			if (inTag) {
+				resolved++;
+			}
+			if (i > 0) {
+				summary.append(", ");
+			}
+			summary.append(names[i]).append('=').append(inTag ? 'Y' : 'N');
+		}
+		return "resolved " + resolved + "/" + states.length + " known emitters | " + summary;
 	}
 
 	private static String buildLocateFailureReason(ServerWorld world, ChunkPos center, int taggedEmittersInRange, int knownEmitterBlocksInRange) {
