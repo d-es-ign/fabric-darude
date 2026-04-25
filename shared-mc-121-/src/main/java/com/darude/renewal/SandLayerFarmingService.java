@@ -28,7 +28,9 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.EnumMap;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -49,12 +51,15 @@ public final class SandLayerFarmingService {
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
 	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
+	private static final int MAX_CHUNK_EMITTER_CACHE_ENTRIES = Integer.getInteger("darude.farming.max_chunk_emitter_cache_entries", 4096);
+	private static final int CHUNK_EMITTER_CACHE_TTL_TICKS = Integer.getInteger("darude.farming.chunk_emitter_cache_ttl_ticks", 200);
 	private static final float THUNDERSTORM_FARMING_MULTIPLIER = 2.5f;
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> FARMING_EMITTERS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
 	private static boolean farmingEmitterFallbackLogged;
 	private static final WeakHashMap<ServerWorld, Boolean> AMPLIFIED_WORLD_CACHE = new WeakHashMap<>();
+	private static final WeakHashMap<ServerWorld, Map<Long, ChunkEmitterCache>> CHUNK_EMITTER_CACHE = new WeakHashMap<>();
 
 	private SandLayerFarmingService() {
 	}
@@ -582,14 +587,94 @@ public final class SandLayerFarmingService {
 			return;
 		}
 
+		ChunkEmitterCache emitterCache = getChunkEmitterCache(world, chunk, biomeCache, emitterMaxY, operationsUsed, farmingOperationLimit, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
+		if (emitterCache.emitterPositions.isEmpty()) {
+			return;
+		}
+
+		for (BlockPos emitterPos : emitterCache.emitterPositions) {
+			if (System.nanoTime() >= deadlineNanos) {
+				return;
+			}
+
+			if (operationsUsed[0] >= farmingOperationLimit) {
+				return;
+			}
+
+			if (!isEmitterBlock(world.getBlockState(emitterPos))) {
+				continue;
+			}
+
+			processEmitterAt(world, emitterPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, 0);
+		}
+	}
+
+	private static ChunkEmitterCache getChunkEmitterCache(
+		ServerWorld world,
+		WorldChunk chunk,
+		Map<Long, Boolean> biomeCache,
+		int emitterMaxY,
+		int[] operationsUsed,
+		int farmingOperationLimit,
+		int[] verticalChecksUsed,
+		int maxVerticalChecks,
+		long deadlineNanos
+	) {
+		Map<Long, ChunkEmitterCache> worldCache = CHUNK_EMITTER_CACHE.computeIfAbsent(world, ignored -> new HashMap<>());
+		if (worldCache.size() > MAX_CHUNK_EMITTER_CACHE_ENTRIES) {
+			worldCache.clear();
+		}
+
+		long chunkKey = chunk.getPos().toLong();
+		ChunkEmitterCache cached = worldCache.get(chunkKey);
+		if (cached != null && cached.emitterMaxY == emitterMaxY && !isChunkEmitterCacheExpired(world, cached)) {
+			return cached;
+		}
+
+		ChunkEmitterCache rebuilt = buildChunkEmitterCache(world, chunk, biomeCache, emitterMaxY, operationsUsed, farmingOperationLimit, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
+		if (rebuilt == null) {
+			return cached != null ? cached : new ChunkEmitterCache(world.getTime(), emitterMaxY, List.of());
+		}
+
+		worldCache.put(chunkKey, rebuilt);
+		return rebuilt;
+	}
+
+	private static boolean isChunkEmitterCacheExpired(ServerWorld world, ChunkEmitterCache cache) {
+		return world.getTime() - cache.builtAtTick > CHUNK_EMITTER_CACHE_TTL_TICKS;
+	}
+
+	private static ChunkEmitterCache buildChunkEmitterCache(
+		ServerWorld world,
+		WorldChunk chunk,
+		Map<Long, Boolean> biomeCache,
+		int emitterMaxY,
+		int[] operationsUsed,
+		int farmingOperationLimit,
+		int[] verticalChecksUsed,
+		int maxVerticalChecks,
+		long deadlineNanos
+	) {
+		ChunkPos chunkPos = chunk.getPos();
+		int minY = Math.max(world.getBottomY(), world.getSeaLevel() + 1);
+		int maxY = Math.min(world.getTopYInclusive(), emitterMaxY);
+		if (maxY < minY) {
+			return new ChunkEmitterCache(world.getTime(), emitterMaxY, List.of());
+		}
+
+		List<BlockPos> emitterPositions = new ArrayList<>();
+		int remainingEmitterBudget = Math.max(0, farmingOperationLimit - operationsUsed[0]);
+		if (remainingEmitterBudget == 0) {
+			return new ChunkEmitterCache(world.getTime(), emitterMaxY, List.of());
+		}
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
 				if (System.nanoTime() >= deadlineNanos) {
-					return;
+					return null;
 				}
 
 				if (operationsUsed[0] >= farmingOperationLimit) {
-					return;
+					return null;
 				}
 
 				int x = chunkPos.getStartX() + localX;
@@ -598,35 +683,31 @@ public final class SandLayerFarmingService {
 					continue;
 				}
 
-				int minY = Math.max(world.getBottomY(), world.getSeaLevel() + 1);
-				int maxY = Math.min(world.getTopYInclusive(), emitterMaxY);
-				if (maxY < minY) {
-					continue;
-				}
-
 				for (int y = maxY; y >= minY; y--) {
 					if (System.nanoTime() >= deadlineNanos) {
-						return;
-					}
-
-					if (verticalChecksUsed[0]++ >= maxVerticalChecks) {
-						return;
+						return null;
 					}
 
 					if (operationsUsed[0] >= farmingOperationLimit) {
-						return;
+						return null;
+					}
+
+					if (verticalChecksUsed[0]++ >= maxVerticalChecks) {
+						return null;
 					}
 
 					BlockPos emitterPos = new BlockPos(x, y, z);
-					BlockState emitterState = world.getBlockState(emitterPos);
-					if (!isEmitterBlock(emitterState)) {
-						continue;
+					if (isEmitterBlock(world.getBlockState(emitterPos))) {
+						emitterPositions.add(emitterPos);
+						if (emitterPositions.size() >= remainingEmitterBudget) {
+							return new ChunkEmitterCache(world.getTime(), emitterMaxY, emitterPositions);
+						}
 					}
-
-					processEmitterAt(world, emitterPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, 0);
 				}
 			}
 		}
+
+		return new ChunkEmitterCache(world.getTime(), emitterMaxY, emitterPositions);
 	}
 
 	private static boolean isChunkInSandstormBiome(ServerWorld world, ChunkPos chunkPos, Map<Long, Boolean> chunkBiomeCache) {
@@ -834,5 +915,8 @@ public final class SandLayerFarmingService {
 			this.label = label;
 			this.concrete = concrete;
 		}
+	}
+
+	private record ChunkEmitterCache(long builtAtTick, int emitterMaxY, List<BlockPos> emitterPositions) {
 	}
 }
