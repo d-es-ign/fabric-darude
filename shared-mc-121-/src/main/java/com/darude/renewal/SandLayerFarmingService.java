@@ -48,7 +48,7 @@ public final class SandLayerFarmingService {
 	private static final int DIAGNOSTIC_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.diagnostic_chunk_scan_radius", 8);
 	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 256;
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
-	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
+	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 10L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
 	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
 	private static final int MAX_CHUNK_EMITTER_CACHE_ENTRIES = Integer.getInteger("darude.farming.max_chunk_emitter_cache_entries", 4096);
@@ -80,6 +80,32 @@ public final class SandLayerFarmingService {
 					.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.getDefaultState(), "Updated ")))
 		));
 		registered = true;
+	}
+
+	public static void onBlockChanged(ServerWorld world, BlockPos pos) {
+		Map<Long, ChunkEmitterCache> worldCache = CHUNK_EMITTER_CACHE.get(world);
+		if (worldCache == null || worldCache.isEmpty()) {
+			return;
+		}
+
+		invalidateChunkEmitterCache(worldCache, pos.getX() >> 4, pos.getZ() >> 4);
+		int localX = pos.getX() & 15;
+		int localZ = pos.getZ() & 15;
+		if (localX == 0) {
+			invalidateChunkEmitterCache(worldCache, (pos.getX() >> 4) - 1, pos.getZ() >> 4);
+		} else if (localX == 15) {
+			invalidateChunkEmitterCache(worldCache, (pos.getX() >> 4) + 1, pos.getZ() >> 4);
+		}
+
+		if (localZ == 0) {
+			invalidateChunkEmitterCache(worldCache, pos.getX() >> 4, (pos.getZ() >> 4) - 1);
+		} else if (localZ == 15) {
+			invalidateChunkEmitterCache(worldCache, pos.getX() >> 4, (pos.getZ() >> 4) + 1);
+		}
+	}
+
+	private static void invalidateChunkEmitterCache(Map<Long, ChunkEmitterCache> worldCache, int chunkX, int chunkZ) {
+		worldCache.remove(ChunkPos.toLong(chunkX, chunkZ));
 	}
 
 	private static void onEndWorldTick(ServerWorld world) {
