@@ -199,7 +199,8 @@ public final class SandLayerFarmingService {
 			updated += markDebugEmittersInChunk(world, levelChunk, biomeCache, counts, emitterMinY, emitterMaxY);
 		}
 
-		source.sendSuccess(() -> Component.literal(buildDebugEmitterSummary(updated, counts)), false);
+		String summary = buildDebugEmitterSummary(updated, counts);
+		source.sendSuccess(() -> Component.literal(summary), false);
 		return updated;
 	}
 

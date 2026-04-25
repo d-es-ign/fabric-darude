@@ -206,7 +206,7 @@ public final class SandLayerFarmingService {
 
 	private static int runDebugFarmingEmitters(ServerCommandSource source) throws CommandSyntaxException {
 		ServerPlayerEntity player = source.getPlayerOrThrow();
-		ServerWorld world = (ServerWorld) player.getWorld();
+		ServerWorld world = source.getWorld();
 		Set<Long> scannedChunks = collectCandidateChunks(player.getChunkPos());
 		Map<Long, Boolean> biomeCache = new HashMap<>();
 		EnumMap<DebugEmitterState, Integer> counts = new EnumMap<>(DebugEmitterState.class);
@@ -225,7 +225,8 @@ public final class SandLayerFarmingService {
 			updated += markDebugEmittersInChunk(world, worldChunk, biomeCache, counts, emitterMinY, emitterMaxY);
 		}
 
-		source.sendFeedback(() -> Text.literal(buildDebugEmitterSummary(updated, counts)), false);
+		String summary = buildDebugEmitterSummary(updated, counts);
+		source.sendFeedback(() -> Text.literal(summary), false);
 		return updated;
 	}
 
