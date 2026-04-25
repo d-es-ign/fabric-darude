@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
+    "minecraft:mangrove_roots",
     "minecraft:copper_grate",
     "minecraft:exposed_copper_grate",
     "minecraft:weathered_copper_grate",

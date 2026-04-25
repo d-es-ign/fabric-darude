@@ -67,6 +67,8 @@ public final class SandLayerFarmingService {
 			CommandManager.literal("darude")
 				.then(CommandManager.literal("debug_farming_emitters")
 					.executes(context -> runDebugFarmingEmitters(context.getSource())))
+				.then(CommandManager.literal("locate_farming_emitters")
+					.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.getDefaultState(), "Updated ")))
 		));
 		registered = true;
 	}
@@ -227,6 +229,57 @@ public final class SandLayerFarmingService {
 
 		String summary = buildDebugEmitterSummary(updated, counts);
 		source.sendFeedback(() -> Text.literal(summary), false);
+		return updated;
+	}
+
+	private static int runPaintEmitterMarkers(ServerCommandSource source, BlockState markerState, String prefix) throws CommandSyntaxException {
+		ServerPlayerEntity player = source.getPlayerOrThrow();
+		ServerWorld world = source.getWorld();
+		Set<Long> scannedChunks = collectCandidateChunks(player.getChunkPos());
+		int updated = 0;
+
+		for (long packedChunkPos : scannedChunks) {
+			int chunkX = ChunkPos.getPackedX(packedChunkPos);
+			int chunkZ = ChunkPos.getPackedZ(packedChunkPos);
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof WorldChunk worldChunk)) {
+				continue;
+			}
+
+			updated += paintEmitterMarkersInChunk(world, worldChunk, markerState);
+		}
+
+		int markerCount = updated;
+		source.sendFeedback(() -> Text.literal(prefix + markerCount + " emitter markers"), false);
+		return updated;
+	}
+
+	private static int paintEmitterMarkersInChunk(ServerWorld world, WorldChunk chunk, BlockState markerState) {
+		int updated = 0;
+		ChunkPos chunkPos = chunk.getPos();
+
+		for (int localX = 0; localX < 16; localX++) {
+			for (int localZ = 0; localZ < 16; localZ++) {
+				int x = chunkPos.getStartX() + localX;
+				int z = chunkPos.getStartZ() + localZ;
+
+				for (int y = world.getBottomY(); y <= world.getTopYInclusive(); y++) {
+					BlockPos emitterPos = new BlockPos(x, y, z);
+					if (!world.getBlockState(emitterPos).isIn(FARMING_EMITTERS)) {
+						continue;
+					}
+
+					BlockPos markerPos = emitterPos.down(2);
+					if (markerPos.getY() < world.getBottomY()) {
+						continue;
+					}
+
+					world.setBlockState(markerPos, markerState, 3);
+					updated++;
+				}
+			}
+		}
+
 		return updated;
 	}
 
