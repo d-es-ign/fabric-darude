@@ -53,6 +53,7 @@ public final class SandLayerFarmingService {
 	private static final TagKey<Biome> SANDSTORM_BIOMES = TagKey.of(RegistryKeys.BIOME, Identifier.of(DarudeMod.MOD_ID, "sandstorm_biomes"));
 	private static final TagKey<net.minecraft.block.Block> FARMING_EMITTERS = TagKey.of(RegistryKeys.BLOCK, Identifier.of(DarudeMod.MOD_ID, "farming_emitters"));
 	private static boolean registered;
+	private static boolean farmingEmitterFallbackLogged;
 	private static final WeakHashMap<ServerWorld, Boolean> AMPLIFIED_WORLD_CACHE = new WeakHashMap<>();
 
 	private SandLayerFarmingService() {
@@ -370,6 +371,28 @@ public final class SandLayerFarmingService {
 			|| state.isOf(Blocks.WAXED_OXIDIZED_COPPER_GRATE);
 	}
 
+	private static boolean isEmitterBlock(BlockState state) {
+		if (state.isIn(FARMING_EMITTERS)) {
+			return true;
+		}
+
+		if (!isKnownEmitterBlock(state)) {
+			return false;
+		}
+
+		logFarmingEmitterFallbackOnce();
+		return true;
+	}
+
+	private static void logFarmingEmitterFallbackOnce() {
+		if (farmingEmitterFallbackLogged) {
+			return;
+		}
+
+		farmingEmitterFallbackLogged = true;
+		DarudeMod.LOGGER.warn("Tag darude:farming_emitters resolved empty at runtime; using built-in emitter fallback list");
+	}
+
 	private static int paintEmitterMarkersInChunk(ServerWorld world, WorldChunk chunk, BlockState markerState) {
 		int updated = 0;
 		ChunkPos chunkPos = chunk.getPos();
@@ -381,7 +404,7 @@ public final class SandLayerFarmingService {
 
 				for (int y = world.getBottomY(); y <= world.getTopYInclusive(); y++) {
 					BlockPos emitterPos = new BlockPos(x, y, z);
-					if (!world.getBlockState(emitterPos).isIn(FARMING_EMITTERS)) {
+					if (!isEmitterBlock(world.getBlockState(emitterPos))) {
 						continue;
 					}
 
@@ -417,7 +440,7 @@ public final class SandLayerFarmingService {
 
 				for (int y = world.getBottomY(); y <= world.getTopYInclusive(); y++) {
 					BlockPos emitterPos = new BlockPos(x, y, z);
-					if (!world.getBlockState(emitterPos).isIn(FARMING_EMITTERS)) {
+					if (!isEmitterBlock(world.getBlockState(emitterPos))) {
 						continue;
 					}
 
@@ -596,7 +619,7 @@ public final class SandLayerFarmingService {
 
 					BlockPos emitterPos = new BlockPos(x, y, z);
 					BlockState emitterState = world.getBlockState(emitterPos);
-					if (!emitterState.isIn(FARMING_EMITTERS)) {
+					if (!isEmitterBlock(emitterState)) {
 						continue;
 					}
 
@@ -702,7 +725,7 @@ public final class SandLayerFarmingService {
 		}
 
 		BlockState state = world.getBlockState(targetPos);
-		if (state.isIn(FARMING_EMITTERS)) {
+		if (isEmitterBlock(state)) {
 			return processEmitterAt(world, targetPos, config, windDirection, random, biomeCache, operationsUsed, farmingOperationLimit, depth + 1);
 		}
 
