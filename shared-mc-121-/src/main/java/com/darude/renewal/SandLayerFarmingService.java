@@ -232,9 +232,14 @@ public final class SandLayerFarmingService {
 			Class<?> gameRulesClass = Class.forName(gameRulesClassName);
 			Field randomTickSpeedField = gameRulesClass.getField("RANDOM_TICK_SPEED");
 			Object randomTickKey = randomTickSpeedField.get(null);
-			Method getInt = gameRules.getClass().getMethod("getInt", randomTickKey.getClass());
-			Object value = getInt.invoke(gameRules, randomTickKey);
+			Object value = invokeMethod(gameRules, "getInt", randomTickKey);
 			if (value instanceof Integer intValue) {
+				return Math.max(1, intValue);
+			}
+
+			Object rule = invokeMethod(gameRules, "get", randomTickKey);
+			Object ruleValue = invokeAny(rule, "get", "intValue", "value");
+			if (ruleValue instanceof Integer intValue) {
 				return Math.max(1, intValue);
 			}
 		} catch (ReflectiveOperationException ignored) {
@@ -609,6 +614,23 @@ public final class SandLayerFarmingService {
 		return null;
 	}
 
+	private static Object invokeMethod(Object target, String methodName, Object argument) throws ReflectiveOperationException {
+		for (Method method : target.getClass().getMethods()) {
+			if (!method.getName().equals(methodName) || method.getParameterCount() != 1) {
+				continue;
+			}
+
+			Class<?> parameterType = method.getParameterTypes()[0];
+			if (!parameterType.isInstance(argument)) {
+				continue;
+			}
+
+			return method.invoke(target, argument);
+		}
+
+		throw new NoSuchMethodException(methodName);
+	}
+
 	private static boolean containsAmplifiedText(Object value) {
 		if (value == null) {
 			return false;
@@ -738,7 +760,14 @@ public final class SandLayerFarmingService {
 					continue;
 				}
 
-				for (int y = maxY; y >= minY; y--) {
+				int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) - 1;
+				int columnMaxY = Math.min(maxY, surfaceY);
+				int columnMinY = Math.max(minY, surfaceY - MAX_EMITTER_DEPTH_FROM_SURFACE);
+				if (columnMaxY < columnMinY) {
+					continue;
+				}
+
+				for (int y = columnMaxY; y >= columnMinY; y--) {
 					if (System.nanoTime() >= deadlineNanos) {
 						return null;
 					}

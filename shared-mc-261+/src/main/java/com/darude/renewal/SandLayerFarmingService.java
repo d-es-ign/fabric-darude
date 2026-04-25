@@ -713,7 +713,14 @@ public final class SandLayerFarmingService {
 					continue;
 				}
 
-				for (int y = maxY; y >= minY; y--) {
+				int surfaceY = world.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+				int columnMaxY = Math.min(maxY, surfaceY);
+				int columnMinY = Math.max(minY, surfaceY - MAX_EMITTER_DEPTH_FROM_SURFACE);
+				if (columnMaxY < columnMinY) {
+					continue;
+				}
+
+				for (int y = columnMaxY; y >= columnMinY; y--) {
 					if (System.nanoTime() >= deadlineNanos) {
 						return null;
 					}
