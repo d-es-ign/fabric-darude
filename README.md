@@ -126,5 +126,5 @@ Parity is complete when both bands match on:
 
 ## Notes
 
-- Minecraft/Fabric prerelease artifacts can lag behind releases.
-- If dependency resolution for `26.1` fails, use exact published coordinates available for that snapshot line.
+- Minecraft/Fabric release artifacts can still lag briefly after a new Minecraft release.
+- If dependency resolution for `26.1` fails, verify the pinned Fabric/Yarn coordinates in `gradle.properties` against the latest published 26.1 artifacts.
