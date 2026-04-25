@@ -141,11 +141,11 @@ public final class SandLayerFarmingService {
 		Map<Long, Boolean> chunkBiomeCache = new HashMap<>();
 		int[] operationsUsed = new int[]{0};
 		int[] verticalChecksUsed = new int[]{0};
+		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, farmingOperationLimit * 32);
 		FarmingDebugStats stats = new FarmingDebugStats();
 		stats.scannedChunks = scannedChunks.size();
 		stats.farmingOperationLimit = farmingOperationLimit;
 		stats.maxVerticalChecks = maxVerticalChecks;
-		int maxVerticalChecks = Math.max(MIN_VERTICAL_CHECKS_PER_TICK, farmingOperationLimit * 32);
 		int emitterMaxY = resolveEmitterMaxY(world);
 		long startedAtNanos = System.nanoTime();
 		long deadlineNanos = startedAtNanos + MAX_FARMING_WORK_NANOS;
