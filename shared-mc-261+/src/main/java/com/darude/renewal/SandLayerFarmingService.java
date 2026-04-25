@@ -70,7 +70,6 @@ public final class SandLayerFarmingService {
 		});
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
 			Commands.literal("darude")
-				.requires(source -> source.hasPermission(2))
 				.then(Commands.literal("debug_farming_emitters")
 					.executes(context -> runDebugFarmingEmitters(context.getSource())))
 		));
@@ -181,7 +180,7 @@ public final class SandLayerFarmingService {
 
 	private static int runDebugFarmingEmitters(CommandSourceStack source) throws CommandSyntaxException {
 		ServerPlayer player = source.getPlayerOrException();
-		ServerLevel world = player.serverLevel();
+		ServerLevel world = (ServerLevel) player.level();
 		Set<Long> scannedChunks = collectCandidateChunks(player.chunkPosition());
 		Map<Long, Boolean> biomeCache = new HashMap<>();
 		EnumMap<DebugEmitterState, Integer> counts = new EnumMap<>(DebugEmitterState.class);
