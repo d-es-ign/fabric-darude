@@ -5,10 +5,15 @@ import com.darude.DarudeDiagnostics;
 import com.darude.DarudeMod;
 import com.darude.block.SandLayerBlock;
 import com.darude.worldgen.SandLayerGenerationConfig;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,6 +29,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.gamerules.GameRules;
 
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -62,6 +68,12 @@ public final class SandLayerFarmingService {
 				onEndWorldTick(world);
 			}
 		});
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
+			Commands.literal("darude")
+				.requires(source -> source.hasPermission(2))
+				.then(Commands.literal("debug_farming_emitters")
+					.executes(context -> runDebugFarmingEmitters(context.getSource())))
+		));
 		registered = true;
 	}
 
@@ -135,11 +147,16 @@ public final class SandLayerFarmingService {
 	private static Set<Long> collectCandidateChunks(ServerLevel world) {
 		Set<Long> chunks = new TreeSet<>();
 		for (ServerPlayer player : world.players()) {
-			ChunkPos center = player.chunkPosition();
-			for (int dz = -PLAYER_CHUNK_SCAN_RADIUS; dz <= PLAYER_CHUNK_SCAN_RADIUS; dz++) {
-				for (int dx = -PLAYER_CHUNK_SCAN_RADIUS; dx <= PLAYER_CHUNK_SCAN_RADIUS; dx++) {
-					chunks.add(ChunkPos.pack(center.x() + dx, center.z() + dz));
-				}
+			chunks.addAll(collectCandidateChunks(player.chunkPosition()));
+		}
+		return chunks;
+	}
+
+	private static Set<Long> collectCandidateChunks(ChunkPos center) {
+		Set<Long> chunks = new TreeSet<>();
+		for (int dz = -PLAYER_CHUNK_SCAN_RADIUS; dz <= PLAYER_CHUNK_SCAN_RADIUS; dz++) {
+			for (int dx = -PLAYER_CHUNK_SCAN_RADIUS; dx <= PLAYER_CHUNK_SCAN_RADIUS; dx++) {
+				chunks.add(ChunkPos.pack(center.x() + dx, center.z() + dz));
 			}
 		}
 		return chunks;
@@ -160,6 +177,114 @@ public final class SandLayerFarmingService {
 		}
 
 		return Math.max(baseLimit + 1, Math.round(baseLimit * THUNDERSTORM_FARMING_MULTIPLIER));
+	}
+
+	private static int runDebugFarmingEmitters(CommandSourceStack source) throws CommandSyntaxException {
+		ServerPlayer player = source.getPlayerOrException();
+		ServerLevel world = player.serverLevel();
+		Set<Long> scannedChunks = collectCandidateChunks(player.chunkPosition());
+		Map<Long, Boolean> biomeCache = new HashMap<>();
+		EnumMap<DebugEmitterState, Integer> counts = new EnumMap<>(DebugEmitterState.class);
+		int emitterMinY = Math.max(world.getMinY(), world.getSeaLevel() + 1);
+		int emitterMaxY = resolveEmitterMaxY(world);
+		int updated = 0;
+
+		for (long packedChunkPos : scannedChunks) {
+			int chunkX = ChunkPos.getX(packedChunkPos);
+			int chunkZ = ChunkPos.getZ(packedChunkPos);
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof LevelChunk levelChunk)) {
+				continue;
+			}
+
+			updated += markDebugEmittersInChunk(world, levelChunk, biomeCache, counts, emitterMinY, emitterMaxY);
+		}
+
+		source.sendSuccess(() -> Component.literal(buildDebugEmitterSummary(updated, counts)), false);
+		return updated;
+	}
+
+	private static int markDebugEmittersInChunk(
+		ServerLevel world,
+		LevelChunk chunk,
+		Map<Long, Boolean> biomeCache,
+		EnumMap<DebugEmitterState, Integer> counts,
+		int emitterMinY,
+		int emitterMaxY
+	) {
+		int updated = 0;
+		ChunkPos chunkPos = chunk.getPos();
+
+		for (int localX = 0; localX < 16; localX++) {
+			for (int localZ = 0; localZ < 16; localZ++) {
+				int x = chunkPos.getMinBlockX() + localX;
+				int z = chunkPos.getMinBlockZ() + localZ;
+
+				for (int y = world.getMinY(); y < world.getMaxY(); y++) {
+					BlockPos emitterPos = new BlockPos(x, y, z);
+					if (!world.getBlockState(emitterPos).is(FARMING_EMITTERS)) {
+						continue;
+					}
+
+					BlockPos markerPos = emitterPos.below(2);
+					if (markerPos.getY() < world.getMinY()) {
+						continue;
+					}
+
+					DebugEmitterState state = classifyDebugEmitterState(world, emitterPos, biomeCache, emitterMinY, emitterMaxY);
+					world.setBlock(markerPos, state.concrete.defaultBlockState(), 3);
+					counts.merge(state, 1, Integer::sum);
+					updated++;
+				}
+			}
+		}
+
+		return updated;
+	}
+
+	private static DebugEmitterState classifyDebugEmitterState(ServerLevel world, BlockPos emitterPos, Map<Long, Boolean> biomeCache, int emitterMinY, int emitterMaxY) {
+		if (emitterPos.getY() < emitterMinY || emitterPos.getY() > emitterMaxY) {
+			return DebugEmitterState.OUTSIDE_Y_RANGE;
+		}
+
+		if (!isInSandstormBiomeColumn(world, emitterPos.getX(), emitterPos.getZ(), biomeCache)) {
+			return DebugEmitterState.INVALID_BIOME;
+		}
+
+		if (!areHorizontalAndAboveAir(world, emitterPos)) {
+			return DebugEmitterState.NOT_SURROUNDED_BY_AIR;
+		}
+
+		if (!hasValidBelowBlock(world, emitterPos)) {
+			return DebugEmitterState.INVALID_BELOW_BLOCKS;
+		}
+
+		if (!world.canSeeSkyFromBelowWater(emitterPos.above())) {
+			return DebugEmitterState.SKY_BLOCKED;
+		}
+
+		if (isQualifiedEmitter(world, emitterPos, biomeCache)) {
+			return DebugEmitterState.CAN_SPAWN;
+		}
+
+		return DebugEmitterState.FALLBACK;
+	}
+
+	private static boolean hasValidBelowBlock(ServerLevel world, BlockPos pos) {
+		BlockState below = world.getBlockState(pos.below());
+		return below.isAir() || below.is(DarudeBlocks.SAND_LAYER) || below.is(DarudeBlocks.PYRAMID) || below.is(DarudeBlocks.FULL_PYRAMID);
+	}
+
+	private static String buildDebugEmitterSummary(int updated, EnumMap<DebugEmitterState, Integer> counts) {
+		StringBuilder summary = new StringBuilder("Updated ").append(updated).append(" emitter markers");
+		for (DebugEmitterState state : DebugEmitterState.values()) {
+			int count = counts.getOrDefault(state, 0);
+			if (count <= 0) {
+				continue;
+			}
+			summary.append(" | ").append(state.label).append(": ").append(count);
+		}
+		return summary.toString();
 	}
 
 	private static boolean isAmplifiedWorld(ServerLevel world) {
@@ -427,8 +552,7 @@ public final class SandLayerFarmingService {
 			return false;
 		}
 
-		BlockState below = world.getBlockState(pos.below());
-		return below.isAir() || below.is(DarudeBlocks.SAND_LAYER) || below.is(DarudeBlocks.PYRAMID) || below.is(DarudeBlocks.FULL_PYRAMID);
+		return hasValidBelowBlock(world, pos);
 	}
 
 	private static boolean areHorizontalAndAboveAir(ServerLevel world, BlockPos pos) {
@@ -474,6 +598,24 @@ public final class SandLayerFarmingService {
 
 		if (supportState.is(DarudeBlocks.PYRAMID) && random.nextFloat() < config.pyramidBreakChance()) {
 			world.setBlock(supportPos, Blocks.AIR.defaultBlockState(), 3);
+		}
+	}
+
+	private enum DebugEmitterState {
+		INVALID_BELOW_BLOCKS("pink", Blocks.PINK_CONCRETE),
+		CAN_SPAWN("lime", Blocks.LIME_CONCRETE),
+		INVALID_BIOME("black", Blocks.BLACK_CONCRETE),
+		NOT_SURROUNDED_BY_AIR("light_blue", Blocks.LIGHT_BLUE_CONCRETE),
+		SKY_BLOCKED("cyan", Blocks.CYAN_CONCRETE),
+		OUTSIDE_Y_RANGE("brown", Blocks.BROWN_CONCRETE),
+		FALLBACK("red", Blocks.RED_CONCRETE);
+
+		private final String label;
+		private final Block concrete;
+
+		DebugEmitterState(String label, Block concrete) {
+			this.label = label;
+			this.concrete = concrete;
 		}
 	}
 }
