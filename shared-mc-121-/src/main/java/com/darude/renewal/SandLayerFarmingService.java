@@ -43,6 +43,7 @@ import java.lang.reflect.Method;
  */
 public final class SandLayerFarmingService {
 	private static final int PLAYER_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.player_chunk_scan_radius", 4);
+	private static final int DIAGNOSTIC_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.diagnostic_chunk_scan_radius", 8);
 	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 256;
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 2L) * 1_000_000L;
@@ -149,9 +150,13 @@ public final class SandLayerFarmingService {
 	}
 
 	private static Set<Long> collectCandidateChunks(ChunkPos center) {
+		return collectCandidateChunks(center, PLAYER_CHUNK_SCAN_RADIUS);
+	}
+
+	private static Set<Long> collectCandidateChunks(ChunkPos center, int radius) {
 		Set<Long> chunks = new TreeSet<>();
-		for (int dz = -PLAYER_CHUNK_SCAN_RADIUS; dz <= PLAYER_CHUNK_SCAN_RADIUS; dz++) {
-			for (int dx = -PLAYER_CHUNK_SCAN_RADIUS; dx <= PLAYER_CHUNK_SCAN_RADIUS; dx++) {
+		for (int dz = -radius; dz <= radius; dz++) {
+			for (int dx = -radius; dx <= radius; dx++) {
 				chunks.add(ChunkPos.toLong(center.x + dx, center.z + dz));
 			}
 		}
@@ -236,6 +241,7 @@ public final class SandLayerFarmingService {
 		ServerPlayerEntity player = source.getPlayerOrThrow();
 		ServerWorld world = source.getWorld();
 		Set<Long> scannedChunks = collectCandidateChunks(player.getChunkPos());
+		int knownEmitterBlocksInRange = countKnownEmitterBlocks(world, scannedChunks);
 		int updated = 0;
 
 		for (long packedChunkPos : scannedChunks) {
@@ -249,9 +255,73 @@ public final class SandLayerFarmingService {
 			updated += paintEmitterMarkersInChunk(world, worldChunk, markerState);
 		}
 
-		int markerCount = updated;
-		source.sendFeedback(() -> Text.literal(prefix + markerCount + " emitter markers"), false);
+		String summary = prefix + updated + " emitter markers" + buildLocateFailureReason(world, player.getChunkPos(), updated, knownEmitterBlocksInRange);
+		source.sendFeedback(() -> Text.literal(summary), false);
 		return updated;
+	}
+
+	private static String buildLocateFailureReason(ServerWorld world, ChunkPos center, int taggedEmittersInRange, int knownEmitterBlocksInRange) {
+		if (taggedEmittersInRange > 0) {
+			return "";
+		}
+
+		if (knownEmitterBlocksInRange > 0) {
+			return " | reason: tag failure (found " + knownEmitterBlocksInRange + " known emitter blocks in active range, but 0 tag matches)";
+		}
+
+		int nearbyKnownEmitterBlocks = countKnownEmitterBlocks(world, collectCandidateChunks(center, DIAGNOSTIC_CHUNK_SCAN_RADIUS));
+		if (nearbyKnownEmitterBlocks > 0) {
+			return " | reason: scan radius issue (found " + nearbyKnownEmitterBlocks + " known emitter blocks within " + DIAGNOSTIC_CHUNK_SCAN_RADIUS + " chunks)";
+		}
+
+		return " | reason: wrong block assumption (no known emitter blocks found within " + DIAGNOSTIC_CHUNK_SCAN_RADIUS + " chunks)";
+	}
+
+	private static int countKnownEmitterBlocks(ServerWorld world, Set<Long> scannedChunks) {
+		int count = 0;
+		for (long packedChunkPos : scannedChunks) {
+			int chunkX = ChunkPos.getPackedX(packedChunkPos);
+			int chunkZ = ChunkPos.getPackedZ(packedChunkPos);
+			var chunk = world.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+			if (!(chunk instanceof WorldChunk worldChunk)) {
+				continue;
+			}
+
+			count += countKnownEmitterBlocksInChunk(world, worldChunk);
+		}
+		return count;
+	}
+
+	private static int countKnownEmitterBlocksInChunk(ServerWorld world, WorldChunk chunk) {
+		int count = 0;
+		ChunkPos chunkPos = chunk.getPos();
+
+		for (int localX = 0; localX < 16; localX++) {
+			for (int localZ = 0; localZ < 16; localZ++) {
+				int x = chunkPos.getStartX() + localX;
+				int z = chunkPos.getStartZ() + localZ;
+
+				for (int y = world.getBottomY(); y <= world.getTopYInclusive(); y++) {
+					if (isKnownEmitterBlock(world.getBlockState(new BlockPos(x, y, z)))) {
+						count++;
+					}
+				}
+			}
+		}
+
+		return count;
+	}
+
+	private static boolean isKnownEmitterBlock(BlockState state) {
+		return state.isOf(Blocks.MANGROVE_ROOTS)
+			|| state.isOf(Blocks.COPPER_GRATE)
+			|| state.isOf(Blocks.EXPOSED_COPPER_GRATE)
+			|| state.isOf(Blocks.WEATHERED_COPPER_GRATE)
+			|| state.isOf(Blocks.OXIDIZED_COPPER_GRATE)
+			|| state.isOf(Blocks.WAXED_COPPER_GRATE)
+			|| state.isOf(Blocks.WAXED_EXPOSED_COPPER_GRATE)
+			|| state.isOf(Blocks.WAXED_WEATHERED_COPPER_GRATE)
+			|| state.isOf(Blocks.WAXED_OXIDIZED_COPPER_GRATE);
 	}
 
 	private static int paintEmitterMarkersInChunk(ServerWorld world, WorldChunk chunk, BlockState markerState) {
