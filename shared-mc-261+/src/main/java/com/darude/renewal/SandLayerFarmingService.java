@@ -196,7 +196,7 @@ public final class SandLayerFarmingService {
 		}
 
 		long gameTime = world.getGameTime();
-		int randomTickSpeed = Math.max(1, world.getGameRules().get(GameRules.RANDOM_TICK_SPEED).get());
+		int randomTickSpeed = Math.max(1, world.getGameRules().get(GameRules.RANDOM_TICK_SPEED));
 		int effectiveIntervalTicks = Math.max(1, config.farmingTickIntervalTicks() / randomTickSpeed);
 		if (gameTime % effectiveIntervalTicks != 0L) {
 			return;
