@@ -9,8 +9,6 @@ public final class SandstormOverlayRenderer {
 	private static final int OVERLAY_BASE_COLOR = 0x24D8C48C;
 	private static final int NOISE_DARK_COLOR = 0x16B59B64;
 	private static final int NOISE_LIGHT_COLOR = 0x18F0DEB2;
-	private static final int NOISE_STEP = 10;
-	private static final int NOISE_DOT_SIZE = 1;
 	private static final float OVERLAY_FADE_STEP = 0.08f;
 	private static final int NOISE_PHASE_TICKS = 2;
 	private static final int[] NOISE_SEEDS = {
@@ -73,7 +71,7 @@ public final class SandstormOverlayRenderer {
 		if (graphicsValue instanceof Enum<?> graphicsEnum) {
 			String name = graphicsEnum.name();
 			if ("FAST".equals(name)) {
-				return OverlayQuality.OFF;
+				return OverlayQuality.LOW;
 			}
 
 			if ("FANCY".equals(name)) {
@@ -127,7 +125,7 @@ public final class SandstormOverlayRenderer {
 	}
 
 	private enum OverlayQuality {
-		OFF(0.4f, 0.22f, 0.7f, 18, 1, 0x7F, 4, 0xFF, 222),
+		LOW(0.4f, 0.22f, 0.7f, 18, 1, 0x7F, 4, 0xFF, 222),
 		FAST(0.7f, 0.6f, 0.85f, 14, 1, 0x3F, 4, 0x7F, 118),
 		FANCY(1.0f, 1.0f, 1.0f, 10, 1, 0x1F, 4, 0x3F, 56);
 
