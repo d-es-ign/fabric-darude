@@ -97,8 +97,8 @@ public final class SandLayerFarmingService {
 	private static boolean canRunDebugCommands(CommandSourceStack source) {
 		Object entity = invokeAny(source, "getEntity");
 		if (entity == null) {
-			Object allowed = invokeAny(source, "hasPermission", "hasPermissionLevel");
-			return allowed instanceof Boolean bool && bool;
+			Boolean allowed = invokeIntPermissionCheck(source, 4, "hasPermission", "hasPermissionLevel");
+			return Boolean.TRUE.equals(allowed);
 		}
 
 		Object server = invokeAny(source, "getServer");
@@ -158,6 +158,31 @@ public final class SandLayerFarmingService {
 		}
 
 		throw new NoSuchMethodException(methodName);
+	}
+
+	private static Boolean invokeIntPermissionCheck(Object target, int value, String... methodNames) {
+		for (String methodName : methodNames) {
+			for (Method method : target.getClass().getMethods()) {
+				if (!method.getName().equals(methodName) || method.getParameterCount() != 1) {
+					continue;
+				}
+
+				Class<?> parameterType = method.getParameterTypes()[0];
+				if (parameterType != int.class && parameterType != Integer.class) {
+					continue;
+				}
+
+				try {
+					Object result = method.invoke(target, value);
+					if (result instanceof Boolean bool) {
+						return bool;
+					}
+				} catch (ReflectiveOperationException ignored) {
+				}
+			}
+		}
+
+		return null;
 	}
 
 	public static void onBlockChanged(ServerLevel world, BlockPos pos) {
