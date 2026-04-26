@@ -75,6 +75,7 @@ public final class SandLayerFarmingService {
 		if (DEBUG_COMMANDS_ENABLED) {
 			CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
 				CommandManager.literal("darude")
+					.requires(SandLayerFarmingService::canRunDebugCommands)
 					.then(CommandManager.literal("debug_farming_emitters")
 						.executes(context -> runDebugFarmingEmitters(context.getSource())))
 					.then(CommandManager.literal("debug_farming_stats")
@@ -86,6 +87,38 @@ public final class SandLayerFarmingService {
 			));
 		}
 		registered = true;
+	}
+
+	private static boolean canRunDebugCommands(ServerCommandSource source) {
+		Object entity = invokeAny(source, "getEntity");
+		if (entity == null) {
+			return true;
+		}
+
+		Object server = invokeAny(source, "getServer");
+		Object playerManager = invokeAny(server, "getPlayerManager", "getPlayerList");
+		Object gameProfile = invokeAny(entity, "getGameProfile");
+		if (playerManager == null || gameProfile == null) {
+			return false;
+		}
+
+		try {
+			Object result = invokeMethod(playerManager, "isOperator", gameProfile);
+			if (result instanceof Boolean allowed) {
+				return allowed;
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
+
+		try {
+			Object result = invokeMethod(playerManager, "isOp", gameProfile);
+			if (result instanceof Boolean allowed) {
+				return allowed;
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
+
+		return false;
 	}
 
 	public static void onBlockChanged(ServerWorld world, BlockPos pos) {
@@ -175,7 +208,7 @@ public final class SandLayerFarmingService {
 		stats.operationsUsed = operationsUsed[0];
 		stats.verticalChecksUsed = verticalChecksUsed[0];
 		stats.deadlineHit = System.nanoTime() >= deadlineNanos;
-		stats.raining = true;
+		stats.raining = world.isRaining();
 		stats.randomTickSpeed = randomTickSpeed;
 		stats.effectiveIntervalTicks = effectiveIntervalTicks;
 		LAST_FARMING_DEBUG_STATS.put(world, stats);

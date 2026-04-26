@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.WeakHashMap;
 import java.lang.reflect.Method;
+import java.lang.reflect.ReflectiveOperationException;
 
 /**
  * V1 sand-layer farming runtime.
@@ -80,6 +81,7 @@ public final class SandLayerFarmingService {
 		if (DEBUG_COMMANDS_ENABLED) {
 			CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
 				Commands.literal("darude")
+					.requires(SandLayerFarmingService::canRunDebugCommands)
 					.then(Commands.literal("debug_farming_emitters")
 						.executes(context -> runDebugFarmingEmitters(context.getSource())))
 					.then(Commands.literal("debug_farming_stats")
@@ -91,6 +93,71 @@ public final class SandLayerFarmingService {
 			));
 		}
 		registered = true;
+	}
+
+	private static boolean canRunDebugCommands(CommandSourceStack source) {
+		Object entity = invokeAny(source, "getEntity");
+		if (entity == null) {
+			return true;
+		}
+
+		Object server = invokeAny(source, "getServer");
+		Object playerList = invokeAny(server, "getPlayerList", "getPlayerManager");
+		Object gameProfile = invokeAny(entity, "getGameProfile");
+		if (playerList == null || gameProfile == null) {
+			return false;
+		}
+
+		try {
+			Object result = invokeMethod(playerList, "isOp", gameProfile);
+			if (result instanceof Boolean allowed) {
+				return allowed;
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
+
+		try {
+			Object result = invokeMethod(playerList, "isOperator", gameProfile);
+			if (result instanceof Boolean allowed) {
+				return allowed;
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
+
+		return false;
+	}
+
+	private static Object invokeAny(Object target, String... methodNames) {
+		if (target == null) {
+			return null;
+		}
+
+		for (String methodName : methodNames) {
+			try {
+				Method method = target.getClass().getMethod(methodName);
+				return method.invoke(target);
+			} catch (ReflectiveOperationException ignored) {
+			}
+		}
+
+		return null;
+	}
+
+	private static Object invokeMethod(Object target, String methodName, Object argument) throws ReflectiveOperationException {
+		for (Method method : target.getClass().getMethods()) {
+			if (!method.getName().equals(methodName) || method.getParameterCount() != 1) {
+				continue;
+			}
+
+			Class<?> parameterType = method.getParameterTypes()[0];
+			if (!parameterType.isInstance(argument)) {
+				continue;
+			}
+
+			return method.invoke(target, argument);
+		}
+
+		throw new NoSuchMethodException(methodName);
 	}
 
 	public static void onBlockChanged(ServerLevel world, BlockPos pos) {
@@ -180,7 +247,7 @@ public final class SandLayerFarmingService {
 		stats.operationsUsed = operationsUsed[0];
 		stats.verticalChecksUsed = verticalChecksUsed[0];
 		stats.deadlineHit = System.nanoTime() >= deadlineNanos;
-		stats.raining = true;
+		stats.raining = world.isRaining();
 		stats.randomTickSpeed = randomTickSpeed;
 		stats.effectiveIntervalTicks = effectiveIntervalTicks;
 		LAST_FARMING_DEBUG_STATS.put(world, stats);
@@ -568,22 +635,6 @@ public final class SandLayerFarmingService {
 		Object server = invokeAny(world, "getServer");
 		Object worldData = invokeAny(server, "getWorldData", "getSaveData");
 		return containsAmplifiedText(worldData);
-	}
-
-	private static Object invokeAny(Object target, String... methodNames) {
-		if (target == null) {
-			return null;
-		}
-
-		for (String methodName : methodNames) {
-			try {
-				Method method = target.getClass().getMethod(methodName);
-				return method.invoke(target);
-			} catch (ReflectiveOperationException ignored) {
-			}
-		}
-
-		return null;
 	}
 
 	private static boolean containsAmplifiedText(Object value) {

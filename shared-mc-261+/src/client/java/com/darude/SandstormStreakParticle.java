@@ -21,6 +21,8 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 	};
 
 	private static final float INSIDE_SOLID_KILL_CHANCE = readFloatProperty("darude.client.inside_solid_kill_chance", 0.35f);
+	private static final Field COLLIDES_WITH_WORLD_FIELD = resolveBooleanField(SingleQuadParticle.class, "collidesWithWorld");
+	private static final Field HAS_PHYSICS_FIELD = resolveBooleanField(SingleQuadParticle.class, "hasPhysics");
 
 	private SandstormStreakParticle(
 		ClientLevel level,
@@ -63,24 +65,34 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 	}
 
 	private static void disableWorldCollision(SingleQuadParticle particle) {
-		setBooleanFieldIfPresent(particle, "collidesWithWorld", false);
-		setBooleanFieldIfPresent(particle, "hasPhysics", false);
+		setBooleanFieldIfPresent(COLLIDES_WITH_WORLD_FIELD, particle, false);
+		setBooleanFieldIfPresent(HAS_PHYSICS_FIELD, particle, false);
 	}
 
-	private static void setBooleanFieldIfPresent(Object target, String fieldName, boolean value) {
-		Class<?> owner = target.getClass();
-		while (owner != null) {
+	private static void setBooleanFieldIfPresent(Field field, Object target, boolean value) {
+		if (field == null) {
+			return;
+		}
+
+		try {
+			field.setBoolean(target, value);
+		} catch (IllegalAccessException ignored) {
+		}
+	}
+
+	private static Field resolveBooleanField(Class<?> owner, String fieldName) {
+		Class<?> current = owner;
+		while (current != null) {
 			try {
-				Field field = owner.getDeclaredField(fieldName);
+				Field field = current.getDeclaredField(fieldName);
 				field.setAccessible(true);
-				field.setBoolean(target, value);
-				return;
+				return field;
 			} catch (NoSuchFieldException ignored) {
-				owner = owner.getSuperclass();
-			} catch (IllegalAccessException ignored) {
-				return;
+				current = current.getSuperclass();
 			}
 		}
+
+		return null;
 	}
 
 	private boolean isInsideSolid() {
