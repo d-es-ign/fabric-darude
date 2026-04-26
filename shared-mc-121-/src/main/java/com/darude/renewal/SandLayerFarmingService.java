@@ -662,12 +662,12 @@ public final class SandLayerFarmingService {
 		}
 
 		ChunkEmitterCache emitterCache = getChunkEmitterCache(world, chunk, biomeCache, emitterMaxY, operationsUsed, farmingOperationLimit, verticalChecksUsed, maxVerticalChecks, deadlineNanos);
-		stats.cachedEmitters += emitterCache.emitterPositions.size();
-		if (emitterCache.emitterPositions.isEmpty()) {
+		stats.cachedEmitters += emitterCache.qualifiedEmitterPositions.size();
+		if (emitterCache.qualifiedEmitterPositions.isEmpty()) {
 			return;
 		}
 
-		for (BlockPos emitterPos : emitterCache.emitterPositions) {
+		for (BlockPos emitterPos : emitterCache.qualifiedEmitterPositions) {
 			if (System.nanoTime() >= deadlineNanos) {
 				return;
 			}
@@ -739,7 +739,7 @@ public final class SandLayerFarmingService {
 			return new ChunkEmitterCache(world.getTime(), emitterMaxY, List.of());
 		}
 
-		List<BlockPos> emitterPositions = new ArrayList<>();
+		List<BlockPos> qualifiedEmitterPositions = new ArrayList<>();
 		int remainingEmitterBudget = Math.max(0, farmingOperationLimit - operationsUsed[0]);
 		if (remainingEmitterBudget == 0) {
 			return new ChunkEmitterCache(world.getTime(), emitterMaxY, List.of());
@@ -781,17 +781,21 @@ public final class SandLayerFarmingService {
 					}
 
 					BlockPos emitterPos = new BlockPos(x, y, z);
-					if (isEmitterBlock(world.getBlockState(emitterPos))) {
-						emitterPositions.add(emitterPos);
-						if (emitterPositions.size() >= remainingEmitterBudget) {
-							return new ChunkEmitterCache(world.getTime(), emitterMaxY, emitterPositions);
+					if (!isEmitterBlock(world.getBlockState(emitterPos))) {
+						continue;
+					}
+
+					if (isQualifiedEmitter(world, emitterPos, biomeCache)) {
+						qualifiedEmitterPositions.add(emitterPos);
+						if (qualifiedEmitterPositions.size() >= remainingEmitterBudget) {
+							return new ChunkEmitterCache(world.getTime(), emitterMaxY, qualifiedEmitterPositions);
 						}
 					}
 				}
 			}
 		}
 
-		return new ChunkEmitterCache(world.getTime(), emitterMaxY, emitterPositions);
+		return new ChunkEmitterCache(world.getTime(), emitterMaxY, qualifiedEmitterPositions);
 	}
 
 	private static boolean isChunkInSandstormBiome(ServerWorld world, ChunkPos chunkPos, Map<Long, Boolean> chunkBiomeCache) {
@@ -1009,7 +1013,7 @@ public final class SandLayerFarmingService {
 		}
 	}
 
-	private record ChunkEmitterCache(long builtAtTick, int emitterMaxY, List<BlockPos> emitterPositions) {
+	private record ChunkEmitterCache(long builtAtTick, int emitterMaxY, List<BlockPos> qualifiedEmitterPositions) {
 	}
 
 	private static final class FarmingDebugStats {
