@@ -746,10 +746,6 @@ public final class SandLayerFarmingService {
 		}
 
 		List<BlockPos> qualifiedEmitterPositions = new ArrayList<>();
-		int remainingEmitterBudget = Math.max(0, farmingOperationLimit - operationsUsed[0]);
-		if (remainingEmitterBudget == 0) {
-			return new ChunkEmitterCache(world.getGameTime(), emitterMaxY, List.of());
-		}
 		for (int localX = 0; localX < 16; localX++) {
 			for (int localZ = 0; localZ < 16; localZ++) {
 				if (System.nanoTime() >= deadlineNanos) {
@@ -793,9 +789,6 @@ public final class SandLayerFarmingService {
 
 					if (isQualifiedEmitter(world, emitterPos, biomeCache)) {
 						qualifiedEmitterPositions.add(emitterPos);
-						if (qualifiedEmitterPositions.size() >= remainingEmitterBudget) {
-							return new ChunkEmitterCache(world.getGameTime(), emitterMaxY, qualifiedEmitterPositions);
-						}
 					}
 				}
 			}

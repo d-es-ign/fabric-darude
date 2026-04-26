@@ -21,6 +21,8 @@ public final class SandstormOverlayRenderer {
 	};
 	private static final int[] NOISE_SHIFT_X = {0, 3, -2, 5, -4, 1};
 	private static final int[] NOISE_SHIFT_Y = {0, -2, 4, -3, 1, 5};
+	private static Method getGraphicsModeMethod;
+	private static Method graphicsValueMethod;
 	private static float overlayStrength;
 
 	private SandstormOverlayRenderer() {
@@ -66,9 +68,8 @@ public final class SandstormOverlayRenderer {
 	}
 
 	private static OverlayQuality resolveOverlayQuality(Minecraft client) {
-		Method graphicsModeMethod = resolveNoArgMethod(client.options.getClass(), "graphicsMode", "getGraphicsMode");
-		Object graphicsOption = invokeNoArg(client.options, graphicsModeMethod);
-		Method graphicsValueMethod = resolveNoArgMethod(graphicsOption != null ? graphicsOption.getClass() : null, "get", "getValue");
+		ensureGraphicsReflection(client);
+		Object graphicsOption = invokeNoArg(client.options, getGraphicsModeMethod);
 		Object graphicsValue = invokeNoArg(graphicsOption, graphicsValueMethod);
 		if (graphicsValue instanceof Enum<?> graphicsEnum) {
 			String name = graphicsEnum.name();
@@ -82,6 +83,16 @@ public final class SandstormOverlayRenderer {
 		}
 
 		return OverlayQuality.FANCY;
+	}
+
+	private static void ensureGraphicsReflection(Minecraft client) {
+		if (getGraphicsModeMethod != null && graphicsValueMethod != null) {
+			return;
+		}
+
+		getGraphicsModeMethod = resolveNoArgMethod(client.options.getClass(), "graphicsMode", "getGraphicsMode");
+		Object graphicsOption = invokeNoArg(client.options, getGraphicsModeMethod);
+		graphicsValueMethod = resolveNoArgMethod(graphicsOption != null ? graphicsOption.getClass() : null, "get", "getValue");
 	}
 
 	private static Object invokeAny(Object target, String... methodNames) {
