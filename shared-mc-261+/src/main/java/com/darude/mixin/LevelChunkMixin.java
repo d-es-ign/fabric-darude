@@ -27,6 +27,10 @@ public abstract class LevelChunkMixin {
 			return;
 		}
 
+		if (!SandLayerFarmingService.shouldInvalidateEmitterCache(serverLevel, pos, cir.getReturnValue(), state)) {
+			return;
+		}
+
 		SandLayerFarmingService.onBlockChanged(serverLevel, pos);
 	}
 }

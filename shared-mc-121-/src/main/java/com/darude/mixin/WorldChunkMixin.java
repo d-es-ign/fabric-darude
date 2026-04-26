@@ -27,6 +27,10 @@ public abstract class WorldChunkMixin {
 			return;
 		}
 
+		if (!SandLayerFarmingService.shouldInvalidateEmitterCache(serverWorld, pos, cir.getReturnValue(), state)) {
+			return;
+		}
+
 		SandLayerFarmingService.onBlockChanged(serverWorld, pos);
 	}
 }

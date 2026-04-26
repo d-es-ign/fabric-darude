@@ -95,22 +95,6 @@ public final class SandstormOverlayRenderer {
 		graphicsValueMethod = resolveNoArgMethod(graphicsOption != null ? graphicsOption.getClass() : null, "get", "getValue");
 	}
 
-	private static Object invokeAny(Object target, String... methodNames) {
-		if (target == null) {
-			return null;
-		}
-
-		for (String methodName : methodNames) {
-			try {
-				Method method = target.getClass().getMethod(methodName);
-				return method.invoke(target);
-			} catch (ReflectiveOperationException ignored) {
-			}
-		}
-
-		return null;
-	}
-
 	private static Method resolveNoArgMethod(Class<?> owner, String... methodNames) {
 		if (owner == null) {
 			return null;

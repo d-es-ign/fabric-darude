@@ -92,7 +92,8 @@ public final class SandLayerFarmingService {
 	private static boolean canRunDebugCommands(ServerCommandSource source) {
 		Object entity = invokeAny(source, "getEntity");
 		if (entity == null) {
-			return true;
+			Object allowed = invokeAny(source, "hasPermissionLevel", "hasPermission", "hasPermissionOrOp");
+			return allowed instanceof Boolean bool && bool;
 		}
 
 		Object server = invokeAny(source, "getServer");
@@ -145,6 +146,20 @@ public final class SandLayerFarmingService {
 
 	private static void invalidateChunkEmitterCache(Map<Long, ChunkEmitterCache> worldCache, int chunkX, int chunkZ) {
 		worldCache.remove(ChunkPos.toLong(chunkX, chunkZ));
+	}
+
+	public static boolean shouldInvalidateEmitterCache(ServerWorld world, BlockPos pos, BlockState previousState, BlockState newState) {
+		if (previousState == null || previousState.equals(newState)) {
+			return false;
+		}
+
+		if (isEmitterBlock(previousState) || isEmitterBlock(newState)) {
+			return true;
+		}
+
+		int minRelevantY = Math.max(world.getBottomY(), world.getSeaLevel()) - 1;
+		int maxRelevantY = resolveEmitterMaxY(world) + 1;
+		return pos.getY() >= minRelevantY && pos.getY() <= maxRelevantY;
 	}
 
 	private static void onEndWorldTick(ServerWorld world) {

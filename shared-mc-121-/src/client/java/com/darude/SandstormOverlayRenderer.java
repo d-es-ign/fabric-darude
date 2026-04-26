@@ -84,22 +84,6 @@ public final class SandstormOverlayRenderer {
 		return OverlayQuality.FANCY;
 	}
 
-	private static Object invokeAny(Object target, String... methodNames) {
-		if (target == null) {
-			return null;
-		}
-
-		for (String methodName : methodNames) {
-			try {
-				Method method = target.getClass().getMethod(methodName);
-				return method.invoke(target);
-			} catch (ReflectiveOperationException ignored) {
-			}
-		}
-
-		return null;
-	}
-
 	private static Method resolveNoArgMethod(Class<?> owner, String... methodNames) {
 		for (String methodName : methodNames) {
 			try {
