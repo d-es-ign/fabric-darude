@@ -50,6 +50,7 @@ public final class SandLayerFarmingService {
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 10L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
+	private static final boolean DEBUG_COMMANDS_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.commands", "false"));
 	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
 	private static final int MAX_CHUNK_EMITTER_CACHE_ENTRIES = Integer.getInteger("darude.farming.max_chunk_emitter_cache_entries", 4096);
 	private static final int CHUNK_EMITTER_CACHE_TTL_TICKS = Integer.getInteger("darude.farming.chunk_emitter_cache_ttl_ticks", 200);
@@ -71,17 +72,19 @@ public final class SandLayerFarmingService {
 		}
 
 		ServerTickEvents.END_WORLD_TICK.register(SandLayerFarmingService::onEndWorldTick);
-		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
-			CommandManager.literal("darude")
-				.then(CommandManager.literal("debug_farming_emitters")
-					.executes(context -> runDebugFarmingEmitters(context.getSource())))
-				.then(CommandManager.literal("debug_farming_stats")
-					.executes(context -> runDebugFarmingStats(context.getSource())))
-				.then(CommandManager.literal("debug_farming_emitter_tag")
-					.executes(context -> runDebugFarmingEmitterTag(context.getSource())))
-				.then(CommandManager.literal("locate_farming_emitters")
-					.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.getDefaultState(), "Updated ")))
-		));
+		if (DEBUG_COMMANDS_ENABLED) {
+			CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
+				CommandManager.literal("darude")
+					.then(CommandManager.literal("debug_farming_emitters")
+						.executes(context -> runDebugFarmingEmitters(context.getSource())))
+					.then(CommandManager.literal("debug_farming_stats")
+						.executes(context -> runDebugFarmingStats(context.getSource())))
+					.then(CommandManager.literal("debug_farming_emitter_tag")
+						.executes(context -> runDebugFarmingEmitterTag(context.getSource())))
+					.then(CommandManager.literal("locate_farming_emitters")
+						.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.getDefaultState(), "Updated ")))
+			));
+		}
 		registered = true;
 	}
 
@@ -230,17 +233,19 @@ public final class SandLayerFarmingService {
 	private static int readRandomTickSpeedReflective(Object gameRules, String gameRulesClassName) {
 		try {
 			Class<?> gameRulesClass = Class.forName(gameRulesClassName);
-			Field randomTickSpeedField = gameRulesClass.getField("RANDOM_TICK_SPEED");
+			Field randomTickSpeedField = getField(gameRulesClass, "RANDOM_TICK_SPEED");
 			Object randomTickKey = randomTickSpeedField.get(null);
 			Object value = invokeMethod(gameRules, "getInt", randomTickKey);
-			if (value instanceof Integer intValue) {
-				return Math.max(1, intValue);
+			int resolved = extractPositiveInt(value);
+			if (resolved > 0) {
+				return resolved;
 			}
 
 			Object rule = invokeMethod(gameRules, "get", randomTickKey);
 			Object ruleValue = invokeAny(rule, "get", "intValue", "value");
-			if (ruleValue instanceof Integer intValue) {
-				return Math.max(1, intValue);
+			resolved = extractPositiveInt(ruleValue);
+			if (resolved > 0) {
+				return resolved;
 			}
 		} catch (ReflectiveOperationException ignored) {
 		}
@@ -628,7 +633,39 @@ public final class SandLayerFarmingService {
 			return method.invoke(target, argument);
 		}
 
+		for (Method method : target.getClass().getDeclaredMethods()) {
+			if (!method.getName().equals(methodName) || method.getParameterCount() != 1) {
+				continue;
+			}
+
+			Class<?> parameterType = method.getParameterTypes()[0];
+			if (!parameterType.isInstance(argument)) {
+				continue;
+			}
+
+			method.setAccessible(true);
+			return method.invoke(target, argument);
+		}
+
 		throw new NoSuchMethodException(methodName);
+	}
+
+	private static Field getField(Class<?> type, String fieldName) throws ReflectiveOperationException {
+		try {
+			return type.getField(fieldName);
+		} catch (NoSuchFieldException ignored) {
+			Field field = type.getDeclaredField(fieldName);
+			field.setAccessible(true);
+			return field;
+		}
+	}
+
+	private static int extractPositiveInt(Object value) {
+		if (value instanceof Number number) {
+			return Math.max(1, number.intValue());
+		}
+
+		return -1;
 	}
 
 	private static boolean containsAmplifiedText(Object value) {

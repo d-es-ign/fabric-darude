@@ -51,6 +51,7 @@ public final class SandLayerFarmingService {
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 10L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
+	private static final boolean DEBUG_COMMANDS_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.commands", "false"));
 	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
 	private static final int MAX_CHUNK_EMITTER_CACHE_ENTRIES = Integer.getInteger("darude.farming.max_chunk_emitter_cache_entries", 4096);
 	private static final int CHUNK_EMITTER_CACHE_TTL_TICKS = Integer.getInteger("darude.farming.chunk_emitter_cache_ttl_ticks", 200);
@@ -76,17 +77,19 @@ public final class SandLayerFarmingService {
 				onEndWorldTick(world);
 			}
 		});
-		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
-			Commands.literal("darude")
-				.then(Commands.literal("debug_farming_emitters")
-					.executes(context -> runDebugFarmingEmitters(context.getSource())))
-				.then(Commands.literal("debug_farming_stats")
-					.executes(context -> runDebugFarmingStats(context.getSource())))
-				.then(Commands.literal("debug_farming_emitter_tag")
-					.executes(context -> runDebugFarmingEmitterTag(context.getSource())))
-				.then(Commands.literal("locate_farming_emitters")
-					.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.defaultBlockState(), "Updated ")))
-		));
+		if (DEBUG_COMMANDS_ENABLED) {
+			CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
+				Commands.literal("darude")
+					.then(Commands.literal("debug_farming_emitters")
+						.executes(context -> runDebugFarmingEmitters(context.getSource())))
+					.then(Commands.literal("debug_farming_stats")
+						.executes(context -> runDebugFarmingStats(context.getSource())))
+					.then(Commands.literal("debug_farming_emitter_tag")
+						.executes(context -> runDebugFarmingEmitterTag(context.getSource())))
+					.then(Commands.literal("locate_farming_emitters")
+						.executes(context -> runPaintEmitterMarkers(context.getSource(), Blocks.WHITE_CONCRETE.defaultBlockState(), "Updated ")))
+			));
+		}
 		registered = true;
 	}
 
