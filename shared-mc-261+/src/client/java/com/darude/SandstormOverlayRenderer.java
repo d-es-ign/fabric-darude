@@ -21,8 +21,6 @@ public final class SandstormOverlayRenderer {
 	};
 	private static final int[] NOISE_SHIFT_X = {0, 3, -2, 5, -4, 1};
 	private static final int[] NOISE_SHIFT_Y = {0, -2, 4, -3, 1, 5};
-	private static final Method GET_GRAPHICS_MODE_METHOD = resolveNoArgMethod(Minecraft.Options.class, "graphicsMode", "getGraphicsMode");
-	private static final Method GRAPHICS_VALUE_METHOD = resolveNoArgMethodFromMethodReturnType(GET_GRAPHICS_MODE_METHOD, "get", "getValue");
 	private static float overlayStrength;
 
 	private SandstormOverlayRenderer() {
@@ -68,8 +66,10 @@ public final class SandstormOverlayRenderer {
 	}
 
 	private static OverlayQuality resolveOverlayQuality(Minecraft client) {
-		Object graphicsOption = invokeNoArg(client.options, GET_GRAPHICS_MODE_METHOD);
-		Object graphicsValue = invokeNoArg(graphicsOption, GRAPHICS_VALUE_METHOD);
+		Method graphicsModeMethod = resolveNoArgMethod(client.options.getClass(), "graphicsMode", "getGraphicsMode");
+		Object graphicsOption = invokeNoArg(client.options, graphicsModeMethod);
+		Method graphicsValueMethod = resolveNoArgMethod(graphicsOption != null ? graphicsOption.getClass() : null, "get", "getValue");
+		Object graphicsValue = invokeNoArg(graphicsOption, graphicsValueMethod);
 		if (graphicsValue instanceof Enum<?> graphicsEnum) {
 			String name = graphicsEnum.name();
 			if ("FAST".equals(name)) {
@@ -101,6 +101,10 @@ public final class SandstormOverlayRenderer {
 	}
 
 	private static Method resolveNoArgMethod(Class<?> owner, String... methodNames) {
+		if (owner == null) {
+			return null;
+		}
+
 		for (String methodName : methodNames) {
 			try {
 				Method method = owner.getMethod(methodName);
@@ -111,14 +115,6 @@ public final class SandstormOverlayRenderer {
 		}
 
 		return null;
-	}
-
-	private static Method resolveNoArgMethodFromMethodReturnType(Method ownerMethod, String... methodNames) {
-		if (ownerMethod == null) {
-			return null;
-		}
-
-		return resolveNoArgMethod(ownerMethod.getReturnType(), methodNames);
 	}
 
 	private static Object invokeNoArg(Object target, Method method) {
