@@ -611,6 +611,12 @@ public final class SandLayerChunkGeneration {
 		return world.getBiome(new BlockPos(centerX, sampleY, centerZ)).is(SANDSTORM_BIOMES);
 	}
 
+	private static void logNearDesertCheckpointOnce(String worldKey, String checkpointKey, String message, Object... args) {
+		if (NEAR_DESERT_CHECKPOINT_LOGS.add(worldKey + ':' + checkpointKey)) {
+			DarudeMod.LOGGER.info(message, args);
+		}
+	}
+
 	private static boolean isChunkInNearDesertRegion(
 		ServerLevel world,
 		String worldKey,
