@@ -21,6 +21,8 @@ public final class SandstormOverlayRenderer {
 	};
 	private static final int[] NOISE_SHIFT_X = {0, 3, -2, 5, -4, 1};
 	private static final int[] NOISE_SHIFT_Y = {0, -2, 4, -3, 1, 5};
+	private static final Method GET_GRAPHICS_MODE_METHOD = resolveNoArgMethod(MinecraftClient.class, "getGraphicsMode", "graphicsMode");
+	private static final Method GRAPHICS_VALUE_METHOD = resolveNoArgMethodFromMethodReturnType(GET_GRAPHICS_MODE_METHOD, "getValue", "get");
 	private static float overlayStrength;
 
 	private SandstormOverlayRenderer() {
@@ -66,8 +68,8 @@ public final class SandstormOverlayRenderer {
 	}
 
 	private static OverlayQuality resolveOverlayQuality(MinecraftClient client) {
-		Object graphicsOption = invokeAny(client.options, "getGraphicsMode", "graphicsMode");
-		Object graphicsValue = invokeAny(graphicsOption, "getValue", "get");
+		Object graphicsOption = invokeNoArg(client.options, GET_GRAPHICS_MODE_METHOD);
+		Object graphicsValue = invokeNoArg(graphicsOption, GRAPHICS_VALUE_METHOD);
 		if (graphicsValue instanceof Enum<?> graphicsEnum) {
 			String name = graphicsEnum.name();
 			if ("FAST".equals(name)) {
@@ -96,6 +98,39 @@ public final class SandstormOverlayRenderer {
 		}
 
 		return null;
+	}
+
+	private static Method resolveNoArgMethod(Class<?> owner, String... methodNames) {
+		for (String methodName : methodNames) {
+			try {
+				Method method = owner.getMethod(methodName);
+				method.setAccessible(true);
+				return method;
+			} catch (ReflectiveOperationException ignored) {
+			}
+		}
+
+		return null;
+	}
+
+	private static Method resolveNoArgMethodFromMethodReturnType(Method ownerMethod, String... methodNames) {
+		if (ownerMethod == null) {
+			return null;
+		}
+
+		return resolveNoArgMethod(ownerMethod.getReturnType(), methodNames);
+	}
+
+	private static Object invokeNoArg(Object target, Method method) {
+		if (target == null || method == null) {
+			return null;
+		}
+
+		try {
+			return method.invoke(target);
+		} catch (ReflectiveOperationException ignored) {
+			return null;
+		}
 	}
 
 	private static void fill(DrawContext drawContext, int x1, int y1, int x2, int y2, int color) {

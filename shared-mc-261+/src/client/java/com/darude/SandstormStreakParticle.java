@@ -56,7 +56,7 @@ public final class SandstormStreakParticle extends SingleQuadParticle {
 
 	@Override
 	public SingleQuadParticle.Layer getLayer() {
-		return SingleQuadParticle.Layer.OPAQUE;
+		return SingleQuadParticle.Layer.TRANSLUCENT;
 	}
 
 	private void applySandPaletteColor(RandomSource random) {

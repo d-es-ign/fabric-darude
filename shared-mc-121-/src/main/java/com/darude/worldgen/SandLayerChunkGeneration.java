@@ -703,7 +703,15 @@ public final class SandLayerChunkGeneration {
 
 	private static boolean isDefaultSandLikeSupport(BlockState state) {
 		return state.isOf(Blocks.SAND)
+			|| state.isOf(Blocks.RED_SAND)
 			|| state.isOf(Blocks.SANDSTONE)
+			|| state.isOf(Blocks.CUT_SANDSTONE)
+			|| state.isOf(Blocks.CHISELED_SANDSTONE)
+			|| state.isOf(Blocks.SMOOTH_SANDSTONE)
+			|| state.isOf(Blocks.RED_SANDSTONE)
+			|| state.isOf(Blocks.CUT_RED_SANDSTONE)
+			|| state.isOf(Blocks.CHISELED_RED_SANDSTONE)
+			|| state.isOf(Blocks.SMOOTH_RED_SANDSTONE)
 			|| state.isOf(Blocks.SUSPICIOUS_SAND);
 	}
 
