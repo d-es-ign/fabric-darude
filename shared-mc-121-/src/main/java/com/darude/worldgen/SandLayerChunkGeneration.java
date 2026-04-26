@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Deque;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class SandLayerChunkGeneration {
@@ -57,6 +58,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
+	private static final AtomicBoolean DESERT_SUPPORT_FALLBACK_LOGGED = new AtomicBoolean();
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int REGION_SHIFT = 3; // 8x8 chunk regions
 	private static final int MAX_REGION_CACHE_ENTRIES = Integer.getInteger("darude.chunkgen.max_region_cache_entries", 8192);
@@ -686,11 +688,38 @@ public final class SandLayerChunkGeneration {
 		world.setBlockState(pos, DarudeBlocks.SAND_LAYER.getDefaultState().with(SandLayerBlock.LAYERS, clampedLayers), net.minecraft.block.Block.NOTIFY_LISTENERS);
 	}
 
-	// TODO: Reintroduce tag-based matching once runtime tag resolution is verified stable.
 	private static boolean isSandLikeSupport(BlockState state) {
+		if (state.isIn(SAND_LAYER_DESERT_SUPPORT)) {
+			return true;
+		}
+
+		if (!isDefaultSandLikeSupport(state)) {
+			return false;
+		}
+
+		logDesertSupportFallbackOnce();
+		return true;
+	}
+
+	private static boolean isDefaultSandLikeSupport(BlockState state) {
 		return state.isOf(Blocks.SAND)
+			|| state.isOf(Blocks.RED_SAND)
 			|| state.isOf(Blocks.SANDSTONE)
+			|| state.isOf(Blocks.CUT_SANDSTONE)
+			|| state.isOf(Blocks.CHISELED_SANDSTONE)
+			|| state.isOf(Blocks.SMOOTH_SANDSTONE)
+			|| state.isOf(Blocks.RED_SANDSTONE)
+			|| state.isOf(Blocks.CUT_RED_SANDSTONE)
+			|| state.isOf(Blocks.CHISELED_RED_SANDSTONE)
+			|| state.isOf(Blocks.SMOOTH_RED_SANDSTONE)
 			|| state.isOf(Blocks.SUSPICIOUS_SAND);
+	}
+
+	private static void logDesertSupportFallbackOnce() {
+		if (!DESERT_SUPPORT_FALLBACK_LOGGED.compareAndSet(false, true)) {
+			return;
+		}
+		DarudeMod.LOGGER.warn("Tag darude:sand_layer_desert_support resolved empty at runtime; using built-in desert support fallback");
 	}
 
 	private static BlockPos findNearbyAirPlacementInChunk(ServerWorld world, WorldChunk chunk, ChunkPos chunkPos, int originLocalX, int originLocalZ) {
