@@ -59,6 +59,7 @@ public final class SandLayerChunkGeneration {
 	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "false"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
+	private static final Set<String> NEAR_DESERT_CHECKPOINT_LOGS = ConcurrentHashMap.newKeySet();
 	private static final AtomicBoolean DESERT_SUPPORT_FALLBACK_LOGGED = new AtomicBoolean();
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int REGION_SHIFT = 3; // 8x8 chunk regions
