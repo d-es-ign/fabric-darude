@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: discover build modules under builds/
         id: discover
         run: |
@@ -37,9 +39,13 @@ jobs:
 
   common:
     runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v5
       - name: setup jdk
@@ -61,6 +67,8 @@ jobs:
     needs: [common, discover-modules]
     if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
     continue-on-error: false
+    env:
+      GH_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
@@ -68,6 +76,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v5
       - name: setup jdk

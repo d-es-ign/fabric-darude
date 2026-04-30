@@ -35,6 +35,25 @@ This repository uses a version-band setup so one branch can support multiple Min
   - `mc261` CI builds on Java `25`
   - using Java `25` locally is the safest option when working across all modules
 
+## Versioning
+
+- Release tags use semver, typically `v<major>.<minor>.<patch>`.
+- Until the first public release, the baseline stays at `0.0.0`.
+- Build version precedence is:
+  1. `MOD_VERSION_OVERRIDE`
+  2. `-PmodVersionOverride=...`
+  3. computed branch version
+  4. `gradle.properties` fallback
+- Computed branch version is:
+  - `major`: latest tagged release major, or current `mod_version` major if no release tag exists yet
+  - `minor`: latest tagged release minor plus merged PR count to `main` since that tag; branch work ahead of `main` uses the next minor
+  - `patch`: commit count ahead of `main`
+- After merges to `main`, active branches should merge/rebase `main` before final merge so their computed minor refreshes.
+- Examples:
+  - no release tag yet, `mod_version=0.0.0`, 13 merged PRs on `main` -> `main` resolves to `0.13.0`
+  - that same baseline with a branch 6 commits ahead of `main` -> branch resolves to `0.14.6`
+  - latest release tag `v1.2.0`, 4 merged PRs since that tag, branch 3 commits ahead of `main` -> branch resolves to `1.7.3`
+
 ## Development commands
 
 - Run 1.21 client: `./gradlew :mc121:runClient`

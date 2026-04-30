@@ -39,6 +39,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: discover publish modules under builds/
         id: discover
@@ -80,6 +82,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: discover-modules
     if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
@@ -87,6 +91,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: setup jdk
         uses: actions/setup-java@v5
@@ -113,7 +119,10 @@ jobs:
             CHANGELOG="${{ inputs.changelog }}"
           fi
 
+          BUILD_VERSION="${VERSION#v}"
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_version=$BUILD_VERSION" >> "$GITHUB_OUTPUT"
           echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
           echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
           {
@@ -123,6 +132,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: build ${{ matrix.module }}
+        env:
+          MOD_VERSION_OVERRIDE: ${{ steps.meta.outputs.build_version }}
         run: ./gradlew --no-configuration-cache -p ${{ matrix.module_path }} build
 
       - name: locate release jar for ${{ matrix.module }}
