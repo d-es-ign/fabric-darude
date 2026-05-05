@@ -55,8 +55,6 @@ public final class SandLayerChunkGeneration {
 	private static final boolean PROCESS_DIRECT_ON_GENERATE = Boolean.parseBoolean(System.getProperty("darude.chunkgen.process_direct_on_generate", "false"));
 	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 16);
 	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 128);
-	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
-	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "false"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> NEAR_DESERT_CHECKPOINT_LOGS = ConcurrentHashMap.newKeySet();
@@ -119,10 +117,6 @@ public final class SandLayerChunkGeneration {
 	}
 
 	private static void drainQueuedChunks(ServerLevel world) {
-		if (CHUNKGEN_DISABLED) {
-			return;
-		}
-
 		String worldKey = world.dimension().toString();
 		QueueState queueState = QUEUES.computeIfAbsent(worldKey, ignored -> new QueueState());
 		int processedThisTick = 0;
@@ -165,22 +159,11 @@ public final class SandLayerChunkGeneration {
 		String chunkPosString = chunk.getPos().toString();
 		String worldKey = world.dimension().toString();
 
-		if (CHUNKGEN_DISABLED) {
-			if (STARTUP_SKIP_LOGGED_WORLDS.add("disabled:" + worldKey)) {
-				DarudeMod.LOGGER.warn("Darude chunk generation disabled via -Ddarude.chunkgen.disable=true for world={}", worldKey);
-			}
-			return true;
-		}
-
 		if (world.getGameTime() < STARTUP_SKIP_TICKS) {
 			if (STARTUP_SKIP_LOGGED_WORLDS.add(worldKey)) {
 				DarudeMod.LOGGER.info("Darude chunk generation startup skip active for world={} until tick {} (current tick={})", worldKey, STARTUP_SKIP_TICKS, world.getGameTime());
 			}
 			return false;
-		}
-
-		if (NEAR_DESERT_DISABLED && STARTUP_SKIP_LOGGED_WORLDS.add("near-desert-disabled:" + worldKey)) {
-			DarudeMod.LOGGER.warn("Darude near-desert chunk generation disabled via -Ddarude.chunkgen.near_desert.disable=true for world={}", worldKey);
 		}
 
 		if (CHUNKGEN_ENABLED_LOGGED_WORLDS.add(worldKey)) {
@@ -211,11 +194,12 @@ public final class SandLayerChunkGeneration {
 			if (config.baseMaxLayers() <= 0 && config.nearDesertMaxLayers() <= 0) {
 				return true;
 			}
+			boolean nearDesertEnabled = config.nearDesertDistance() > 0;
 
 		ChunkPos chunkPos = chunk.getPos();
 		long precheckStartedAtNanos = System.nanoTime();
 		boolean fastBiomeSandstorm = isChunkLikelySandstormBiomeFast(world, chunkPos);
-		if (USE_FAST_BIOME_SKIP && NEAR_DESERT_DISABLED && !fastBiomeSandstorm) {
+		if (USE_FAST_BIOME_SKIP && !nearDesertEnabled && !fastBiomeSandstorm) {
 			tickBudget.skippedFastBiome++;
 			if (PROFILE_CHUNKGEN) {
 				DarudeMod.LOGGER.info("Profile[chunkgen-skip-fast-biome] world={} chunk={} elapsedMs={}", worldKey, chunkPos, (System.nanoTime() - precheckStartedAtNanos) / 1_000_000L);
@@ -230,12 +214,9 @@ public final class SandLayerChunkGeneration {
 		Map<Long, Boolean> biomeInSandstormCache = new HashMap<>();
 		Map<Long, Boolean> nearDesertSandCache = new HashMap<>();
 
-		boolean shouldProcess;
-		if (NEAR_DESERT_DISABLED) {
-			shouldProcess = isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache);
-		} else {
-			shouldProcess = shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache);
-		}
+		boolean shouldProcess = nearDesertEnabled
+			? shouldProcessChunk(world, worldKey, chunkPos, config.nearDesertDistance(), chunkAvailabilityCache, topYSurfaceCache, biomeInSandstormCache)
+			: isChunkInSandstormBiomeCurrentChunk(world, chunk, chunkPos, biomeInSandstormCache);
 
 		if (!shouldProcess) {
 			tickBudget.skippedPrecheck++;
@@ -385,7 +366,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
-				if (NEAR_DESERT_DISABLED) {
+				if (!nearDesertEnabled) {
 					continue;
 				}
 
@@ -601,7 +582,7 @@ public final class SandLayerChunkGeneration {
 			return true;
 		}
 
-		if (nearDesertDistance <= 0 || NEAR_DESERT_DISABLED) {
+		if (nearDesertDistance <= 0) {
 			return false;
 		}
 
