@@ -57,6 +57,8 @@ jobs:
         run: chmod +x ./gradlew
       - name: validate version band registration
         run: ./scripts/validate-version-band-registration.sh
+      - name: run versioning unit tests
+        run: python3 -m unittest discover -s tests
       - name: run common checks and harness
         run: ./gradlew --no-configuration-cache -p common check
       - name: run shared-mc verification

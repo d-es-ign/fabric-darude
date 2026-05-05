@@ -1,5 +1,6 @@
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 from scripts import versioning
@@ -48,3 +49,18 @@ class VersioningTests(TestCase):
             patch.object(versioning, "fallback_baseline", return_value=versioning.Baseline(versioning.Version(0, 1, 0), None)),
         ):
             self.assertEqual(versioning.resolved_version(repo_root), "0.1.0")
+
+    def test_merged_pr_count_since_uses_timeout(self) -> None:
+        repo_root = Path("/repo")
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.__exit__.return_value = None
+
+        with (
+            patch.object(versioning, "repo_slug", return_value="d-es-ign/fabric-darude"),
+            patch.object(versioning.json, "load", return_value={"total_count": 7}),
+            patch.object(versioning, "urlopen", return_value=response) as mock_urlopen,
+        ):
+            self.assertEqual(versioning.merged_pr_count_since(repo_root, None), 7)
+
+        self.assertEqual(mock_urlopen.call_args.kwargs["timeout"], versioning.GITHUB_API_TIMEOUT_SECONDS)

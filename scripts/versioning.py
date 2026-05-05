@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 
 SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+GITHUB_API_TIMEOUT_SECONDS = 5
 
 
 @dataclass(frozen=True)
@@ -150,7 +151,7 @@ def merged_pr_count_since(repo_root: Path, tag_name: str | None) -> int | None:
     )
 
     try:
-        with urlopen(request) as response:
+        with urlopen(request, timeout=GITHUB_API_TIMEOUT_SECONDS) as response:
             payload = json.load(response)
     except Exception:
         return None

@@ -409,10 +409,12 @@ public final class SandLayerChunkGeneration {
 				if (!nearDesertSand) {
 					continue;
 				}
+				logNearDesertCheckpointOnce(worldKey, "probe-succeeded", "near-desert checkpoint: probe succeeded world={} chunk={} pos={}", worldKey, chunkPos, placementPos);
 
 				BlockPos supportPos = placementPos.below();
 				BlockState supportState = world.getBlockState(supportPos);
 				if (!isNearDesertSpawnableSupport(world, supportPos, supportState, config)) {
+					logNearDesertCheckpointOnce(worldKey, "support-rejected", "near-desert checkpoint: support rejected world={} chunk={} pos={} support={}", worldKey, chunkPos, placementPos, supportState.getBlock());
 					continue;
 				}
 
@@ -421,6 +423,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
+				logNearDesertCheckpointOnce(worldKey, "placement-succeeded", "near-desert checkpoint: placement succeeded world={} chunk={} pos={} layers={}", worldKey, chunkPos, placementPos, layerCount);
 				setSandLayers(world, placementPos, layerCount);
 				placements++;
 			
@@ -659,6 +662,9 @@ public final class SandLayerChunkGeneration {
 			worldRegionCache.clear();
 		}
 		worldRegionCache.put(regionKey, nearDesert);
+		if (nearDesert) {
+			logNearDesertCheckpointOnce(worldKey, "precheck-passed", "near-desert checkpoint: precheck passed world={} region={},{} distance={}", worldKey, regionX, regionZ, nearDesertDistance);
+		}
 		return nearDesert;
 	}
 

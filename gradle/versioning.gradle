@@ -24,9 +24,14 @@ def fallbackVersion = (binding.hasVariable('prop')
 def envOverride = System.getenv('MOD_VERSION_OVERRIDE')
 def gradleOverride = project.findProperty('modVersionOverride')
 def versioningRepoRoot = project.hasProperty('repoRootDir') ? project.property('repoRootDir') : rootDir
-def resolvedByScript = runCommand([
-	'/bin/bash',
-	new File(versioningRepoRoot, 'scripts/resolve-version.sh').absolutePath,
+def pythonCommand = ['python3', 'python'].find { candidate ->
+	runCommand([candidate, '--version']) != null
+}
+def resolvedByScript = pythonCommand == null ? null : runCommand([
+	pythonCommand,
+	new File(versioningRepoRoot, 'scripts/versioning.py').absolutePath,
+	'resolve',
+	'--repo-root',
 	versioningRepoRoot.absolutePath,
 ])
 
