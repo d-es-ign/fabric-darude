@@ -50,8 +50,7 @@ public final class SandLayerFarmingService {
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 10L) * 1_000_000L;
 	private static final boolean FARMING_DISABLED = Boolean.parseBoolean(System.getProperty("darude.farming.disable", "false"));
-	// TODO: Revert debug command default to false before merging this branch to main.
-	private static final boolean DEBUG_COMMANDS_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.commands", "true"));
+	private static final boolean DEBUG_COMMANDS_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.commands", "false"));
 	private static final int DEFAULT_EMITTER_MAX_Y = Integer.getInteger("darude.farming.default_emitter_max_y", 100);
 	private static final int MAX_CHUNK_EMITTER_CACHE_ENTRIES = Integer.getInteger("darude.farming.max_chunk_emitter_cache_entries", 4096);
 	private static final int CHUNK_EMITTER_CACHE_TTL_TICKS = Integer.getInteger("darude.farming.chunk_emitter_cache_ttl_ticks", 200);
