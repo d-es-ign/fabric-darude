@@ -1,0 +1,38 @@
+name: sync mod version
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: sync mod_version in gradle.properties
+        run: python3 ./scripts/versioning.py sync-gradle-properties --repo-root .
+
+      - name: commit synced mod version
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: sync mod_version
+          file_pattern: gradle.properties

@@ -1,0 +1,50 @@
+def runCommand = { List<String> command ->
+	try {
+		def process = new ProcessBuilder(command)
+			.directory(project.projectDir)
+			.redirectErrorStream(true)
+			.start()
+		process.waitFor()
+
+		if (process.exitValue() != 0) {
+			return null
+		}
+
+		def output = process.inputStream.getText('UTF-8').trim()
+		return output ? output : null
+	} catch (Exception ignored) {
+		return null
+	}
+}
+
+def fallbackVersion = (binding.hasVariable('prop')
+	? prop('mod_version')
+	: project.findProperty('mod_version')) ?: '0.1.0'
+
+def envOverride = System.getenv('MOD_VERSION_OVERRIDE')
+def gradleOverride = project.findProperty('modVersionOverride')
+def versioningRepoRoot = project.hasProperty('repoRootDir') ? project.property('repoRootDir') : rootDir
+def resolvedVersionCacheByRepoRoot = rootProject.ext.has('resolvedVersionCacheByRepoRoot')
+	? rootProject.ext.get('resolvedVersionCacheByRepoRoot')
+	: [:]
+rootProject.ext.set('resolvedVersionCacheByRepoRoot', resolvedVersionCacheByRepoRoot)
+
+def resolvedByScript = null
+if (!envOverride && !gradleOverride) {
+	def repoRootKey = versioningRepoRoot.canonicalPath
+	if (!resolvedVersionCacheByRepoRoot.containsKey(repoRootKey)) {
+		def pythonCommand = ['python3', 'python'].find { candidate ->
+			runCommand([candidate, '--version']) != null
+		}
+		resolvedVersionCacheByRepoRoot[repoRootKey] = pythonCommand == null ? null : runCommand([
+			pythonCommand,
+			new File(versioningRepoRoot, 'scripts/versioning.py').absolutePath,
+			'resolve',
+			'--repo-root',
+			versioningRepoRoot.absolutePath,
+		])
+	}
+	resolvedByScript = resolvedVersionCacheByRepoRoot[repoRootKey]
+}
+
+ext.resolvedModVersion = (envOverride ?: gradleOverride ?: resolvedByScript ?: fallbackVersion).replaceFirst(/^v/, '')

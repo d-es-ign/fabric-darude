@@ -3,9 +3,12 @@ plugins {
 	id 'maven-publish'
 }
 
+ext.repoRootDir = rootDir
+apply from: file('gradle/versioning.gradle')
+
 allprojects {
 	group = project.maven_group
-	version = project.mod_version
+	version = resolvedModVersion
 }
 
 subprojects {

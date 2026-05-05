@@ -2,6 +2,18 @@ plugins {
 	id 'java-library'
 }
 
+def inheritedProps = new Properties()
+file('../gradle.properties').withInputStream { inheritedProps.load(it) }
+def prop = { String key ->
+	project.findProperty(key) ?: rootProject.findProperty(key) ?: inheritedProps.getProperty(key)
+}
+
+ext.repoRootDir = file('..')
+apply from: file('../gradle/versioning.gradle')
+
+group = prop('maven_group')
+version = resolvedModVersion
+
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 21
 }

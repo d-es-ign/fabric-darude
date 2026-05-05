@@ -56,9 +56,10 @@ public final class SandLayerChunkGeneration {
 	private static final int MAX_QUEUED_CHUNKS_PER_TICK = Integer.getInteger("darude.chunkgen.max_queued_chunks_per_tick", 16);
 	private static final int MAX_UNAVAILABLE_RETRIES = Integer.getInteger("darude.chunkgen.max_unavailable_retries", 128);
 	private static final boolean CHUNKGEN_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.disable", "false"));
-	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "true"));
+	private static final boolean NEAR_DESERT_DISABLED = Boolean.parseBoolean(System.getProperty("darude.chunkgen.near_desert.disable", "false"));
 	private static final Set<String> STARTUP_SKIP_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
 	private static final Set<String> CHUNKGEN_ENABLED_LOGGED_WORLDS = ConcurrentHashMap.newKeySet();
+	private static final Set<String> NEAR_DESERT_CHECKPOINT_LOGS = ConcurrentHashMap.newKeySet();
 	private static final AtomicBoolean DESERT_SUPPORT_FALLBACK_LOGGED = new AtomicBoolean();
 	private static final int MAX_OFFSET_RADIUS = 8;
 	private static final int REGION_SHIFT = 3; // 8x8 chunk regions
@@ -408,10 +409,12 @@ public final class SandLayerChunkGeneration {
 				if (!nearDesertSand) {
 					continue;
 				}
+				logNearDesertCheckpointOnce(worldKey, "probe-succeeded", "near-desert checkpoint: probe succeeded world={} chunk={} pos={}", worldKey, chunkPos, placementPos);
 
 				BlockPos supportPos = placementPos.below();
 				BlockState supportState = world.getBlockState(supportPos);
 				if (!isNearDesertSpawnableSupport(world, supportPos, supportState, config)) {
+					logNearDesertCheckpointOnce(worldKey, "support-rejected", "near-desert checkpoint: support rejected world={} chunk={} pos={} support={}", worldKey, chunkPos, placementPos, supportState.getBlock());
 					continue;
 				}
 
@@ -420,6 +423,7 @@ public final class SandLayerChunkGeneration {
 					continue;
 				}
 
+				logNearDesertCheckpointOnce(worldKey, "placement-succeeded", "near-desert checkpoint: placement succeeded world={} chunk={} pos={} layers={}", worldKey, chunkPos, placementPos, layerCount);
 				setSandLayers(world, placementPos, layerCount);
 				placements++;
 			
@@ -611,6 +615,12 @@ public final class SandLayerChunkGeneration {
 		return world.getBiome(new BlockPos(centerX, sampleY, centerZ)).is(SANDSTORM_BIOMES);
 	}
 
+	private static void logNearDesertCheckpointOnce(String worldKey, String checkpointKey, String message, Object... args) {
+		if (NEAR_DESERT_CHECKPOINT_LOGS.add(worldKey + ':' + checkpointKey)) {
+			DarudeMod.LOGGER.info(message, args);
+		}
+	}
+
 	private static boolean isChunkInNearDesertRegion(
 		ServerLevel world,
 		String worldKey,
@@ -652,6 +662,9 @@ public final class SandLayerChunkGeneration {
 			worldRegionCache.clear();
 		}
 		worldRegionCache.put(regionKey, nearDesert);
+		if (nearDesert) {
+			logNearDesertCheckpointOnce(worldKey, "precheck-passed", "near-desert checkpoint: precheck passed world={} region={},{} distance={}", worldKey, regionX, regionZ, nearDesertDistance);
+		}
 		return nearDesert;
 	}
 

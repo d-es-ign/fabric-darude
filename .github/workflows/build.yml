@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: discover build modules under builds/
         id: discover
         run: |
@@ -37,9 +39,13 @@ jobs:
 
   common:
     runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v5
       - name: setup jdk
@@ -56,11 +62,25 @@ jobs:
       - name: run shared-mc verification
         run: ./gradlew --no-configuration-cache -p shared-mc-121- check && ./gradlew --no-configuration-cache -p shared-mc-261+ check
 
+  python-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: run versioning unit tests
+        run: python3 -m unittest discover -s tests
+
   build-versions:
     runs-on: ubuntu-24.04
-    needs: [common, discover-modules]
+    needs: [common, python-tests, discover-modules]
     if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
     continue-on-error: false
+    env:
+      GH_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
@@ -68,6 +88,8 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v5
       - name: setup jdk
