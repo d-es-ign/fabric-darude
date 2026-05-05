@@ -64,3 +64,9 @@ class VersioningTests(TestCase):
             self.assertEqual(versioning.merged_pr_count_since(repo_root, None), 7)
 
         self.assertEqual(mock_urlopen.call_args.kwargs["timeout"], versioning.GITHUB_API_TIMEOUT_SECONDS)
+
+    def test_merged_pr_count_since_returns_none_without_repo_slug(self) -> None:
+        repo_root = Path("/repo")
+
+        with patch.object(versioning, "repo_slug", return_value=None):
+            self.assertIsNone(versioning.merged_pr_count_since(repo_root, None))

@@ -51,7 +51,15 @@ import re
 import subprocess
 import sys
 
-remote = subprocess.check_output(['git', '-C', sys.argv[1], 'remote', 'get-url', 'origin'], text=True).strip()
+try:
+    remote = subprocess.check_output(
+        ['git', '-C', sys.argv[1], 'remote', 'get-url', 'origin'],
+        stderr=subprocess.DEVNULL,
+        text=True,
+    ).strip()
+except subprocess.CalledProcessError:
+    raise SystemExit(0)
+
 for pattern in (r'github\.com:(.+?)(?:\.git)?$', r'github\.com/(.+?)(?:\.git)?$'):
     match = re.search(pattern, remote)
     if match:
@@ -59,6 +67,11 @@ for pattern in (r'github\.com:(.+?)(?:\.git)?$', r'github\.com/(.+?)(?:\.git)?$'
         raise SystemExit(0)
 PY
 )
+
+if [[ -z "$repo_slug" ]]; then
+  printf '%s\n' "$fallback_version"
+  exit 0
+fi
 
 query="repo:${repo_slug} is:pr is:merged base:main"
 if [[ -n "$baseline_tag" ]]; then
