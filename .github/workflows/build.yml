@@ -57,16 +57,26 @@ jobs:
         run: chmod +x ./gradlew
       - name: validate version band registration
         run: ./scripts/validate-version-band-registration.sh
-      - name: run versioning unit tests
-        run: python3 -m unittest discover -s tests
       - name: run common checks and harness
         run: ./gradlew --no-configuration-cache -p common check
       - name: run shared-mc verification
         run: ./gradlew --no-configuration-cache -p shared-mc-121- check && ./gradlew --no-configuration-cache -p shared-mc-261+ check
 
+  python-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: run versioning unit tests
+        run: python3 -m unittest discover -s tests
+
   build-versions:
     runs-on: ubuntu-24.04
-    needs: [common, discover-modules]
+    needs: [common, python-tests, discover-modules]
     if: ${{ needs.discover-modules.outputs.matrix != '[]' }}
     continue-on-error: false
     env:
