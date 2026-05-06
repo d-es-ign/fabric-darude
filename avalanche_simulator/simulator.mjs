@@ -231,6 +231,22 @@ function computeBounds(columns, emitter) {
   return { minX: minX - 1, maxX: maxX + 1, minZ: minZ - 1, maxZ: maxZ + 1 };
 }
 
+function computeGlobalBounds(snapshots, emitter) {
+  let minX = emitter.x - 1;
+  let maxX = emitter.x + 1;
+  let minZ = emitter.z - 1;
+  let maxZ = emitter.z + 1;
+
+  for (const snapshot of snapshots) {
+    minX = Math.min(minX, snapshot.bounds.minX);
+    maxX = Math.max(maxX, snapshot.bounds.maxX);
+    minZ = Math.min(minZ, snapshot.bounds.minZ);
+    maxZ = Math.max(maxZ, snapshot.bounds.maxZ);
+  }
+
+  return { minX, maxX, minZ, maxZ };
+}
+
 function snapshotFrom(columns, stepIndex, stepSummary, options) {
   return {
     stepIndex,
@@ -312,6 +328,7 @@ export function runBasicEmitterSimulation(customOptions = {}) {
   return {
     options,
     snapshots,
+    globalBounds: computeGlobalBounds(snapshots, options.emitter),
     blocked,
     finalStepIndex: finalSnapshot.stepIndex,
     totalLayers: totalLayers(finalSnapshot.columns),

@@ -8,29 +8,43 @@
   </head>
   <body>
     <main>
-      <section class="panel panel--intro">
-        <h1>Darude Avalanche Simulator</h1>
-        <p id="simulation-status"></p>
-      </section>
+      <section class="panel panel--controls">
+        <div class="panel__intro">
+          <h1>Darude Avalanche Simulator</h1>
+          <p id="simulation-status"></p>
+        </div>
 
-      <section class="controls controls--timeline" aria-label="Timeline controls">
-        <button id="step-back" type="button" aria-label="Previous step">-</button>
-        <label class="controls__label" for="step-slider" id="step-label">Step 0 of 0</label>
-        <input id="step-slider" name="step-slider" type="range" min="0" max="0" step="1" value="0" />
-        <button id="step-forward" type="button" aria-label="Next step">+</button>
-      </section>
+        <div class="controls controls--timeline" aria-label="Timeline controls">
+          <button id="step-back" type="button" aria-label="Previous step">-</button>
+          <label class="controls__label" for="step-input" id="step-label">
+            Step
+            <input id="step-input" name="step-input" type="number" min="0" max="0" step="1" value="0" />
+            of <span id="step-total">0</span>
+          </label>
+          <input id="step-slider" name="step-slider" type="range" min="0" max="0" step="1" value="0" />
+          <button id="step-forward" type="button" aria-label="Next step">+</button>
+        </div>
 
-      <section class="panel panel--summary">
-        <dl class="stats" id="stats"></dl>
+        <div class="panel__metrics">
+          <dl class="stats" id="stats"></dl>
+          <div class="chart-panel">
+            <div class="chart-scroll">
+              <canvas id="origin-height-chart" aria-label="Origin height over steps"></canvas>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="panel panel--map">
         <div class="map-wrapper">
-          <table class="heightmap" id="heightmap"></table>
+          <div class="heightmap-scale" id="heightmap-scale">
+            <table class="heightmap" id="heightmap"></table>
+          </div>
         </div>
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script type="module" src="script.js"></script>
   </body>
   </html>
