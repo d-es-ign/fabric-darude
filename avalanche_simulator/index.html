@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Darude Avalanche Simulator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <section class="panel panel--intro">
+        <h1>Darude Avalanche Simulator</h1>
+        <p id="simulation-status"></p>
+      </section>
+
+      <section class="controls controls--timeline" aria-label="Timeline controls">
+        <button id="step-back" type="button" aria-label="Previous step">-</button>
+        <label class="controls__label" for="step-slider" id="step-label">Step 0 of 0</label>
+        <input id="step-slider" name="step-slider" type="range" min="0" max="0" step="1" value="0" />
+        <button id="step-forward" type="button" aria-label="Next step">+</button>
+      </section>
+
+      <section class="panel panel--summary">
+        <dl class="stats" id="stats"></dl>
+      </section>
+
+      <section class="panel panel--map">
+        <div class="map-wrapper">
+          <table class="heightmap" id="heightmap"></table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="script.js"></script>
+  </body>
+  </html>
