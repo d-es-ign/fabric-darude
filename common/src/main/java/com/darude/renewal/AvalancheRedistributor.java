@@ -74,7 +74,10 @@ public final class AvalancheRedistributor {
 			int sourceY = idx / width;
 
 			int candidateCount = buildToppleCandidates(grid, width, height, sourceX, sourceY);
-			if (candidateCount == 0) continue;
+			if (candidateCount == 0) {
+				grid.settleCell(sourceX, sourceY);
+				continue;
+			}
 
 			boolean changed = executeTopple(grid, sourceX, sourceY, candidateCount);
 			if (!changed) continue;
@@ -117,6 +120,9 @@ public final class AvalancheRedistributor {
 		 * current grid bounds.
 		 */
 		void addTransferredLayers(int x, int y, int layers);
+
+		default void settleCell(int x, int y) {
+		}
 	}
 
 	public enum NeighborState {
