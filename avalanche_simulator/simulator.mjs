@@ -9,6 +9,7 @@ const DEFAULTS = {
   slopeThreshold: 3,
   maxTopplesPerTick: 64,
   maxSimulationSteps: 2048,
+  stopOnDirectTwoCellReversal: true, // this currently drifts from the mod behavior .
   emitter: { x: 0, z: 0 },
 };
 
@@ -130,12 +131,14 @@ function enqueueNeighbors(queueState, columns, slopeThreshold, x, z) {
 }
 
 function runAvalancheTick(columns, options) {
-  const { slopeThreshold, maxTopplesPerTick, emitter } = options;
+  const { slopeThreshold, maxTopplesPerTick, emitter, stopOnDirectTwoCellReversal } = options;
   const queueState = seedQueue(columns, slopeThreshold);
   let processedTopples = 0;
   let anyChange = false;
   const events = [];
   const toppleLimit = maxTopplesPerTick === 0 ? Number.POSITIVE_INFINITY : maxTopplesPerTick;
+  let shortCircuitHit = false;
+  let previousSingleTargetTopple = null;
 
   while (queueState.queue.length > 0 && processedTopples < toppleLimit) {
     const key = queueState.queue.shift();
@@ -202,6 +205,7 @@ function runAvalancheTick(columns, options) {
     sourceColumn.activeLayers -= transferLayers;
     anyChange = true;
     const event = {
+      type: "topple",
       source: { x, z },
       sourceHeight,
       resultingSourceHeight: sourceColumn.activeLayers,
@@ -224,11 +228,35 @@ function runAvalancheTick(columns, options) {
     }
     events.push(event);
 
+    if (stopOnDirectTwoCellReversal) {
+      const receivingTargets = event.targets.filter((target) => target.layers > 0);
+      if (receivingTargets.length === 1) {
+        const onlyTarget = receivingTargets[0];
+        if (
+          previousSingleTargetTopple
+          && previousSingleTargetTopple.source.x === onlyTarget.x
+          && previousSingleTargetTopple.source.z === onlyTarget.z
+          && previousSingleTargetTopple.target.x === event.source.x
+          && previousSingleTargetTopple.target.z === event.source.z
+        ) {
+          shortCircuitHit = true;
+          break;
+        }
+
+        previousSingleTargetTopple = {
+          source: event.source,
+          target: { x: onlyTarget.x, z: onlyTarget.z },
+        };
+      } else {
+        previousSingleTargetTopple = null;
+      }
+    }
+
     processedTopples += 1;
   }
 
   const capHit = Number.isFinite(toppleLimit) && processedTopples >= toppleLimit;
-  return { anyChange, processedTopples, events, capHit };
+  return { anyChange, processedTopples, events, capHit, shortCircuitHit };
 }
 
 function applyEmitterPlacement(columns, options) {
@@ -427,7 +455,7 @@ export function runBasicEmitterSimulation(customOptions = {}) {
   const options = normalizeSimulationOptions(customOptions);
 
   const columns = new Map();
-  const initialSummary = { placements: 0, blocked: false, topples: 0, events: [], capHit: false, residualUnstableCells: 0, nonOriginOverflowViolations: [], originPlacementIncrementOk: true };
+  const initialSummary = { placements: 0, blocked: false, topples: 0, events: [], capHit: false, shortCircuitHit: false, residualUnstableCells: 0, nonOriginOverflowViolations: [], originPlacementIncrementOk: true };
   initialSummary.invariants = collectInvariantDiagnostics(columns, options, initialSummary);
   const snapshots = [snapshotFrom(columns, 0, initialSummary, options)];
   let blocked = false;
@@ -442,12 +470,13 @@ export function runBasicEmitterSimulation(customOptions = {}) {
     const stepSummary = {
       placements,
       blocked,
-      topples: avalancheTick.processedTopples,
-      events: avalancheTick.events,
-      capHit: avalancheTick.capHit,
-      residualUnstableCells,
-      nonOriginOverflowViolations,
-      originBeforePlacement,
+          topples: avalancheTick.processedTopples,
+          events: avalancheTick.events,
+          capHit: avalancheTick.capHit,
+          shortCircuitHit: avalancheTick.shortCircuitHit,
+          residualUnstableCells,
+          nonOriginOverflowViolations,
+          originBeforePlacement,
       originAfterPlacementBeforeAvalanche: placement.changed ? originBeforePlacement + 1 : originBeforePlacement,
     };
     stepSummary.originPlacementIncrementOk = stepSummary.originAfterPlacementBeforeAvalanche - originBeforePlacement <= 1;
@@ -475,5 +504,68 @@ export function runBasicEmitterSimulation(customOptions = {}) {
     finalStepIndex: finalSnapshot.stepIndex,
     totalLayers: totalLayers(finalSnapshot.columns),
     occupiedColumns: countOccupiedColumns(finalSnapshot.columns),
+  };
+}
+
+export function findImmediateSplitReturnWitness(searchOptions = {}) {
+  const thresholds = searchOptions.thresholds ?? [1, 2, 3, 4];
+  const budgets = searchOptions.budgets ?? [4, 16, 64, 0];
+  const maxSimulationSteps = searchOptions.maxSimulationSteps ?? 2000;
+  const stopOnDirectTwoCellReversal = searchOptions.stopOnDirectTwoCellReversal ?? false;
+
+  for (const slopeThreshold of thresholds) {
+    for (const maxTopplesPerTick of budgets) {
+      const simulation = runBasicEmitterSimulation({ slopeThreshold, maxTopplesPerTick, maxSimulationSteps, stopOnDirectTwoCellReversal });
+      for (const snapshot of simulation.snapshots) {
+        for (const event of snapshot.stepSummary.events ?? []) {
+          if (event.type === "settle" || event.type === "violation") {
+            continue;
+          }
+
+          if (event.source.x === simulation.options.emitter.x && event.source.z === simulation.options.emitter.z) {
+            continue;
+          }
+
+          const receivingTargets = event.targets.filter((target) => target.layers > 0);
+          if (receivingTargets.length < 2) {
+            continue;
+          }
+
+          for (const target of receivingTargets) {
+            const recipientAfterActive = target.afterActive;
+            const sourceAfterActive = event.resultingSourceHeight;
+            const canReturnDirectly = recipientAfterActive - sourceAfterActive > simulation.options.slopeThreshold;
+            if (!canReturnDirectly) {
+              continue;
+            }
+
+            return {
+              found: true,
+              type: "immediate_split_return",
+              threshold: slopeThreshold,
+              budget: maxTopplesPerTick,
+              step: snapshot.stepIndex,
+              source: event.source,
+              sourceBefore: event.sourceHeight,
+              sourceAfter: sourceAfterActive,
+              recipient: { x: target.x, z: target.z },
+              recipientBefore: target.beforeActive,
+              recipientAfter: recipientAfterActive,
+              transferLayers: event.transferLayers,
+              recipientCount: receivingTargets.length,
+              targets: receivingTargets,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    found: false,
+    type: "immediate_split_return",
+    thresholds,
+    budgets,
+    maxSimulationSteps,
   };
 }
