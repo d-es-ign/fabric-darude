@@ -25,21 +25,43 @@
           <button id="step-forward" type="button" aria-label="Next step">+</button>
         </div>
 
+        <div class="controls controls--parameters" aria-label="Simulation parameters">
+          <label class="controls__label" for="max-topples-input">
+            Max topples (64)
+            <input id="max-topples-input" name="max-topples-input" type="number" min="0" step="1" value="64" />
+          </label>
+          <label class="controls__label" for="threshold-input">
+            Threshold (3)
+            <input id="threshold-input" name="threshold-input" type="number" min="1" step="1" value="3" />
+          </label>
+          <button id="reset-parameters" type="button">Reset defaults</button>
+        </div>
+
         <div class="panel__metrics">
           <dl class="stats" id="stats"></dl>
-          <div class="chart-panel">
-            <div class="chart-scroll">
+          <section class="warnings" id="warnings" aria-label="Simulation warnings"></section>
+          <div class="charts-scroll">
+            <div class="chart-panel">
               <canvas id="origin-height-chart" aria-label="Origin height over steps"></canvas>
+            </div>
+            <div class="chart-panel">
+              <canvas id="topples-chart" aria-label="Topples per step"></canvas>
             </div>
           </div>
         </div>
       </section>
 
       <section class="panel panel--map">
-        <div class="map-wrapper">
-          <div class="heightmap-scale" id="heightmap-scale">
-            <table class="heightmap" id="heightmap"></table>
+        <div class="map-layout">
+          <div class="map-wrapper">
+            <div class="heightmap-scale" id="heightmap-scale">
+              <table class="heightmap" id="heightmap"></table>
+            </div>
           </div>
+          <aside class="topple-log" aria-label="Topples for current step">
+            <h2 class="topple-log__title">Topples this step</h2>
+            <ol class="topple-log__list" id="topple-log"></ol>
+          </aside>
         </div>
       </section>
     </main>

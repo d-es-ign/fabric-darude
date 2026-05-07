@@ -34,6 +34,14 @@ function getTotalLayers(column) {
   return column.stableSandBlocks * 16 + column.activeLayers;
 }
 
+function totalMass(columns) {
+  let total = 0;
+  for (const column of columns.values()) {
+    total += getTotalLayers(column);
+  }
+  return total;
+}
+
 function hasEmitterOccupancy(x, z, emitter) {
   return x === emitter.x && z === emitter.z;
 }
@@ -49,14 +57,30 @@ function canAcceptHorizontalLayers(columns, x, z, emitter) {
 function settleColumn(columns, x, z, emitter) {
   const column = getColumn(columns, x, z);
   if (column.activeLayers < 16) {
-    return false;
+    return null;
+  }
+
+  if (!hasEmitterOccupancy(x, z, emitter)) {
+    return {
+      type: "violation",
+      kind: "non_origin_overflow",
+      location: { x, z },
+      beforeActiveHeight: column.activeLayers,
+    };
   }
 
   const createdSandBlocks = Math.floor(column.activeLayers / 16);
   const remainder = column.activeLayers % 16;
+  const beforeActiveHeight = column.activeLayers;
   column.stableSandBlocks += createdSandBlocks;
   column.activeLayers = hasEmitterOccupancy(x, z, emitter) && column.stableSandBlocks > 0 ? 0 : remainder;
-  return true;
+  return {
+    type: "settle",
+    location: { x, z },
+    beforeActiveHeight,
+    afterStableSandBlocks: column.stableSandBlocks,
+    afterActiveHeight: column.activeLayers,
+  };
 }
 
 function addHorizontalLayers(columns, x, z, layers, emitter) {
@@ -110,8 +134,10 @@ function runAvalancheTick(columns, options) {
   const queueState = seedQueue(columns, slopeThreshold);
   let processedTopples = 0;
   let anyChange = false;
+  const events = [];
+  const toppleLimit = maxTopplesPerTick === 0 ? Number.POSITIVE_INFINITY : maxTopplesPerTick;
 
-  while (queueState.queue.length > 0 && processedTopples < maxTopplesPerTick) {
+  while (queueState.queue.length > 0 && processedTopples < toppleLimit) {
     const key = queueState.queue.shift();
     queueState.seen.delete(key);
 
@@ -143,9 +169,13 @@ function runAvalancheTick(columns, options) {
     }
 
     if (candidates.length === 0) {
-      if (settleColumn(columns, x, z, emitter)) {
+      const settleEvent = settleColumn(columns, x, z, emitter);
+      if (settleEvent?.type === "settle") {
         anyChange = true;
+        events.push(settleEvent);
         enqueueNeighbors(queueState, columns, slopeThreshold, x, z);
+      } else if (settleEvent?.type === "violation") {
+        events.push(settleEvent);
       }
       continue;
     }
@@ -171,20 +201,34 @@ function runAvalancheTick(columns, options) {
 
     sourceColumn.activeLayers -= transferLayers;
     anyChange = true;
+    const event = {
+      source: { x, z },
+      sourceHeight,
+      resultingSourceHeight: sourceColumn.activeLayers,
+      transferLayers,
+      targets: [],
+    };
 
     enqueueNeighbors(queueState, columns, slopeThreshold, x, z);
     for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
       const candidate = candidates[candidateIndex];
+      const targetColumn = getColumn(columns, candidate.x, candidate.z);
+      const targetBefore = getTotalLayers(targetColumn);
+      const targetBeforeActive = targetColumn.activeLayers;
       const added = addHorizontalLayers(columns, candidate.x, candidate.z, shares[candidateIndex], emitter);
+      const targetAfter = getTotalLayers(getColumn(columns, candidate.x, candidate.z));
+      event.targets.push({ x: candidate.x, z: candidate.z, layers: added, before: targetBefore, after: targetAfter, beforeActive: targetBeforeActive, afterActive: getColumn(columns, candidate.x, candidate.z).activeLayers });
       if (added > 0) {
         enqueueNeighbors(queueState, columns, slopeThreshold, candidate.x, candidate.z);
       }
     }
+    events.push(event);
 
     processedTopples += 1;
   }
 
-  return { anyChange, processedTopples };
+  const capHit = Number.isFinite(toppleLimit) && processedTopples >= toppleLimit;
+  return { anyChange, processedTopples, events, capHit };
 }
 
 function applyEmitterPlacement(columns, options) {
@@ -193,14 +237,46 @@ function applyEmitterPlacement(columns, options) {
     return { blocked: true, changed: false };
   }
 
-  if (origin.activeLayers < 15) {
-    origin.activeLayers += 1;
-    return { blocked: false, changed: true };
-  }
+  origin.activeLayers += 1;
+  return { blocked: false, changed: true };
+}
 
-  origin.stableSandBlocks += 1;
-  origin.activeLayers = 0;
-  return { blocked: true, changed: true };
+function countResidualUnstableCells(columns, options) {
+  const { slopeThreshold, emitter } = options;
+  let count = 0;
+  for (const [key, column] of columns.entries()) {
+    if (column.activeLayers <= slopeThreshold) {
+      continue;
+    }
+
+    const [xString, zString] = key.split(",");
+    const x = Number.parseInt(xString, 10);
+    const z = Number.parseInt(zString, 10);
+    let canStillTopple = false;
+
+    for (const [dx, dz] of CARDINALS) {
+      const neighborX = x + dx;
+      const neighborZ = z + dz;
+      if (!canAcceptHorizontalLayers(columns, neighborX, neighborZ, emitter)) {
+        continue;
+      }
+
+      const neighborColumn = getColumn(columns, neighborX, neighborZ);
+      if (column.activeLayers - neighborColumn.activeLayers > slopeThreshold) {
+        canStillTopple = true;
+        break;
+      }
+    }
+
+    if (canStillTopple) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function collectNonOriginOverflowViolations(events) {
+  return events.filter((event) => event.type === "violation" && event.kind === "non_origin_overflow");
 }
 
 function computeBounds(columns, emitter) {
@@ -267,11 +343,67 @@ function countOccupiedColumns(columns) {
 }
 
 function totalLayers(columns) {
-  let total = 0;
-  for (const column of columns.values()) {
-    total += getTotalLayers(column);
+  return totalMass(columns);
+}
+
+function collectInvariantDiagnostics(columns, options, stepSummary) {
+  const diagnostics = {
+    massConserved: totalMass(columns) === stepSummary.placements,
+    negativeHeightCells: [],
+    invalidToppleEvents: [],
+    teleportationViolations: [],
+  };
+
+  for (const [key, column] of columns.entries()) {
+    if (column.stableSandBlocks < 0 || column.activeLayers < 0) {
+      const [xString, zString] = key.split(",");
+      diagnostics.negativeHeightCells.push({ x: Number.parseInt(xString, 10), z: Number.parseInt(zString, 10), stableSandBlocks: column.stableSandBlocks, activeLayers: column.activeLayers });
+    }
   }
-  return total;
+
+  for (const event of stepSummary.events ?? []) {
+    if (event.type !== "topple") {
+      continue;
+    }
+
+    for (const target of event.targets) {
+      if (target.layers <= 0) {
+        continue;
+      }
+
+      const manhattanDistance = Math.abs(target.x - event.source.x) + Math.abs(target.z - event.source.z);
+      if (manhattanDistance !== 1) {
+        diagnostics.teleportationViolations.push({ source: event.source, target: { x: target.x, z: target.z }, layers: target.layers });
+      }
+
+      if (event.sourceHeight <= target.beforeActive || event.sourceHeight - target.beforeActive <= options.slopeThreshold) {
+        diagnostics.invalidToppleEvents.push({
+          source: event.source,
+          sourceHeight: event.sourceHeight,
+          target: { x: target.x, z: target.z },
+          targetBeforeActive: target.beforeActive,
+        });
+      }
+    }
+  }
+
+  diagnostics.noNegativeHeights = diagnostics.negativeHeightCells.length === 0;
+  diagnostics.topplesStrictlyDownhill = diagnostics.invalidToppleEvents.length === 0;
+  diagnostics.noTeleportation = diagnostics.teleportationViolations.length === 0;
+  diagnostics.locallyStableIfCapNotHit = stepSummary.capHit || stepSummary.residualUnstableCells === 0;
+  return diagnostics;
+}
+
+export function normalizeSimulationOptions(customOptions = {}) {
+  const slopeThreshold = Math.max(1, Math.round(customOptions.slopeThreshold ?? DEFAULTS.slopeThreshold));
+  const rawMaxTopplesPerTick = Math.max(0, Math.round(customOptions.maxTopplesPerTick ?? DEFAULTS.maxTopplesPerTick));
+  return {
+    ...DEFAULTS,
+    ...customOptions,
+    slopeThreshold,
+    maxTopplesPerTick: rawMaxTopplesPerTick,
+    emitter: { ...DEFAULTS.emitter, ...(customOptions.emitter ?? {}) },
+  };
 }
 
 export function describeCell(column) {
@@ -292,29 +424,39 @@ export function getColumnSnapshot(snapshot, x, z) {
 }
 
 export function runBasicEmitterSimulation(customOptions = {}) {
-  const options = {
-    ...DEFAULTS,
-    ...customOptions,
-    emitter: { ...DEFAULTS.emitter, ...(customOptions.emitter ?? {}) },
-  };
+  const options = normalizeSimulationOptions(customOptions);
 
   const columns = new Map();
-  const snapshots = [snapshotFrom(columns, 0, { placements: 0, blocked: false, topples: 0, quiesceTicks: 0 }, options)];
+  const initialSummary = { placements: 0, blocked: false, topples: 0, events: [], capHit: false, residualUnstableCells: 0, nonOriginOverflowViolations: [], originPlacementIncrementOk: true };
+  initialSummary.invariants = collectInvariantDiagnostics(columns, options, initialSummary);
+  const snapshots = [snapshotFrom(columns, 0, initialSummary, options)];
   let blocked = false;
 
   for (let placements = 1; placements <= options.maxSimulationSteps; placements += 1) {
+    const originBeforePlacement = getColumn(columns, options.emitter.x, options.emitter.z).activeLayers;
     const placement = applyEmitterPlacement(columns, options);
     const avalancheTick = runAvalancheTick(columns, options);
-    blocked = placement.blocked;
+    blocked = getColumn(columns, options.emitter.x, options.emitter.z).stableSandBlocks > 0;
+    const residualUnstableCells = countResidualUnstableCells(columns, options);
+    const nonOriginOverflowViolations = collectNonOriginOverflowViolations(avalancheTick.events);
+    const stepSummary = {
+      placements,
+      blocked,
+      topples: avalancheTick.processedTopples,
+      events: avalancheTick.events,
+      capHit: avalancheTick.capHit,
+      residualUnstableCells,
+      nonOriginOverflowViolations,
+      originBeforePlacement,
+      originAfterPlacementBeforeAvalanche: placement.changed ? originBeforePlacement + 1 : originBeforePlacement,
+    };
+    stepSummary.originPlacementIncrementOk = stepSummary.originAfterPlacementBeforeAvalanche - originBeforePlacement <= 1;
+    stepSummary.invariants = collectInvariantDiagnostics(columns, options, stepSummary);
     snapshots.push(
       snapshotFrom(
         columns,
         placements,
-        {
-          placements,
-          blocked,
-          topples: avalancheTick.processedTopples,
-        },
+        stepSummary,
         options,
       ),
     );
