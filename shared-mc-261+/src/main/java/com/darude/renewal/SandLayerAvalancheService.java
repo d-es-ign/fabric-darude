@@ -185,7 +185,7 @@ public final class SandLayerAvalancheService {
 			}
 
 			int idx = indexOf(x, z);
-			activeHeights[idx] = Math.max(0, newHeight);
+			setColumnState(idx, stableSandBlocks[idx], Math.max(0, newHeight));
 			BlockPos pos = worldPos(x, z, y);
 			applyColumnStateAt(pos, stableSandBlocks[idx], activeHeights[idx]);
 		}
@@ -202,8 +202,7 @@ public final class SandLayerAvalancheService {
 				return;
 			}
 
-			stableSandBlocks[idx] += activeHeight / 16;
-			activeHeights[idx] = activeHeight % 16;
+			setColumnState(idx, stableSandBlocks[idx], activeHeight);
 			applyColumnStateAt(worldPos(x, z, y), stableSandBlocks[idx], activeHeights[idx]);
 		}
 
@@ -261,8 +260,14 @@ public final class SandLayerAvalancheService {
 			addLayersConservatively(targetPos, layers);
 
 			if (!verticalTarget) {
-				activeHeights[indexOf(localX, z)] += layers;
+				int idx = indexOf(localX, z);
+				setColumnState(idx, stableSandBlocks[idx], activeHeights[idx] + layers);
 			}
+		}
+
+		private void setColumnState(int idx, int stableBlocks, int activeHeight) {
+			stableSandBlocks[idx] = normalizedStableSandBlocks(stableBlocks, activeHeight);
+			activeHeights[idx] = normalizedActiveHeight(stableBlocks, activeHeight);
 		}
 
 		private void loadColumnStates() {
@@ -448,6 +453,18 @@ public final class SandLayerAvalancheService {
 		private int indexOf(int x, int z) {
 			return z * width + x;
 		}
+	}
+
+	static int normalizedStableSandBlocks(int stableBlocks, int activeHeight) {
+		return normalizeTotalLayers(stableBlocks, activeHeight) / 16;
+	}
+
+	static int normalizedActiveHeight(int stableBlocks, int activeHeight) {
+		return normalizeTotalLayers(stableBlocks, activeHeight) % 16;
+	}
+
+	private static int normalizeTotalLayers(int stableBlocks, int activeHeight) {
+		return Math.max(0, stableBlocks * 16 + activeHeight);
 	}
 
 	private record ColumnState(int stableSandBlocks, int activeHeight) {
