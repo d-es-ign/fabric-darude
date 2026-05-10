@@ -20,6 +20,7 @@ public final class AvalancheRedistributorHarness {
 		testPureVerticalUsesFullDump();
 		testRemainderPrefersVerticalThenCardinal();
 		testTransferConversionCreatesSandWithRemainderOnTop();
+		testBlockedOverflowSettlesIntoStableSand();
 		System.out.println("AvalancheRedistributor harness: OK");
 	}
 
@@ -164,6 +165,20 @@ public final class AvalancheRedistributorHarness {
 		check(grid.getHeight(2, 1) == 1, "conversion remainder should be placed on top cell");
 	}
 
+	private static void testBlockedOverflowSettlesIntoStableSand() {
+		TestGrid grid = new TestGrid(3, 3);
+		grid.enableTransferConversionModel();
+		grid.setInitialHeight(1, 1, 18);
+		grid.setAllNeighborsBlocked(1, 1);
+
+		AvalancheRedistributor redistributor = new AvalancheRedistributor(3);
+		int processed = redistributor.redistributeBudget(grid, 1);
+
+		check(processed == 0, "blocked overflow should not count as a topple");
+		check(grid.sandBlocksAt(1, 1) == 1, "blocked overflow should settle one full sand block in place");
+		check(grid.getHeight(1, 1) == 2, "blocked overflow should leave only the unsettled remainder as active height");
+	}
+
 	private static void check(boolean condition, String message) {
 		if (!condition) throw new IllegalStateException("Harness check failed: " + message);
 	}
@@ -250,6 +265,27 @@ public final class AvalancheRedistributorHarness {
 
 			if (remainder > 0) {
 				addRawLayers(x, y - 1, remainder);
+			}
+		}
+
+		@Override
+		public void settleCell(int x, int y) {
+			if (!transferConversionModelEnabled) {
+				return;
+			}
+
+			int current = getHeight(x, y);
+			if (current < LAYERS_PER_SAND_BLOCK) {
+				return;
+			}
+
+			int createdBlocks = current / LAYERS_PER_SAND_BLOCK;
+			int remainder = current % LAYERS_PER_SAND_BLOCK;
+			sandBlocks.put(key(x, y), sandBlocks.getOrDefault(key(x, y), 0) + createdBlocks);
+			if (inBounds(x, y)) {
+				heights[y][x] = remainder;
+			} else {
+				virtualHeights.put(key(x, y), remainder);
 			}
 		}
 

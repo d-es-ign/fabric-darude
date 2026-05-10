@@ -127,7 +127,8 @@ public final class SandLayerAvalancheService {
 		private final int y;
 		private final int width;
 		private final int height;
-		private final int[] heights;
+		private final int[] activeHeights;
+		private final int[] stableSandBlocks;
 
 		private WindowGrid(ServerLevel world, int minX, int minZ, int y, int width, int height) {
 			this.world = world;
@@ -136,7 +137,8 @@ public final class SandLayerAvalancheService {
 			this.y = y;
 			this.width = width;
 			this.height = height;
-			this.heights = new int[width * height];
+			this.activeHeights = new int[width * height];
+			this.stableSandBlocks = new int[width * height];
 		}
 
 		static WindowGrid create(ServerLevel world, BlockPos center, int chunkWindowRadius) {
@@ -157,7 +159,7 @@ public final class SandLayerAvalancheService {
 			int minX = (centerChunkX - chunkWindowRadius) << 4;
 			int minZ = (centerChunkZ - chunkWindowRadius) << 4;
 			WindowGrid grid = new WindowGrid(world, minX, minZ, center.getY(), width, height);
-			grid.loadHeights();
+			grid.loadColumnStates();
 			return grid;
 		}
 
@@ -173,7 +175,7 @@ public final class SandLayerAvalancheService {
 
 		@Override
 		public int getHeight(int x, int z) {
-			return heights[indexOf(x, z)];
+			return activeHeights[indexOf(x, z)];
 		}
 
 		@Override
@@ -183,10 +185,25 @@ public final class SandLayerAvalancheService {
 			}
 
 			int idx = indexOf(x, z);
-			heights[idx] = Math.max(0, newHeight);
+			setColumnState(idx, stableSandBlocks[idx], Math.max(0, newHeight));
 			BlockPos pos = worldPos(x, z, y);
-			setColumnHeightAt(pos, heights[idx]);
-			heights[idx] = readColumnHeightAt(pos);
+			applyColumnStateAt(pos, stableSandBlocks[idx], activeHeights[idx]);
+		}
+
+		@Override
+		public void settleCell(int x, int z) {
+			if (!inBounds(x, z)) {
+				return;
+			}
+
+			int idx = indexOf(x, z);
+			int activeHeight = activeHeights[idx];
+			if (activeHeight < 16) {
+				return;
+			}
+
+			setColumnState(idx, stableSandBlocks[idx], activeHeight);
+			applyColumnStateAt(worldPos(x, z, y), stableSandBlocks[idx], activeHeights[idx]);
 		}
 
 		@Override
@@ -199,7 +216,7 @@ public final class SandLayerAvalancheService {
 			BlockPos neighborPos = worldPos(neighborX, neighborZ, y);
 			BlockState neighborState = world.getBlockState(neighborPos);
 			if (isSandMass(neighborState)) {
-				out.set(AvalancheRedistributor.NeighborState.VALID, heights[indexOf(neighborX, neighborZ)], neighborX, neighborZ);
+				out.set(AvalancheRedistributor.NeighborState.VALID, activeHeights[indexOf(neighborX, neighborZ)], neighborX, neighborZ);
 				return;
 			}
 
@@ -243,16 +260,25 @@ public final class SandLayerAvalancheService {
 			addLayersConservatively(targetPos, layers);
 
 			if (!verticalTarget) {
-				heights[indexOf(localX, z)] = readColumnHeightAt(worldPos(localX, z, y));
+				int idx = indexOf(localX, z);
+				setColumnState(idx, stableSandBlocks[idx], activeHeights[idx] + layers);
 			}
 		}
 
-		private void loadHeights() {
+		private void setColumnState(int idx, int stableBlocks, int activeHeight) {
+			stableSandBlocks[idx] = normalizedStableSandBlocks(stableBlocks, activeHeight);
+			activeHeights[idx] = normalizedActiveHeight(stableBlocks, activeHeight);
+		}
+
+		private void loadColumnStates() {
 			BlockPos.MutableBlockPos cursor = BlockPos.ZERO.mutable();
 			for (int z = 0; z < height; z++) {
 				for (int x = 0; x < width; x++) {
 					cursor.set(minX + x, y, minZ + z);
-					heights[indexOf(x, z)] = readColumnHeightAt(cursor);
+					ColumnState state = readColumnStateAt(cursor);
+					int idx = indexOf(x, z);
+					stableSandBlocks[idx] = state.stableSandBlocks();
+					activeHeights[idx] = state.activeHeight();
 				}
 			}
 		}
@@ -270,14 +296,14 @@ public final class SandLayerAvalancheService {
 			return DarudeBlocks.SAND_LAYER.defaultBlockState().setValue(SandLayerBlock.LAYERS, 1).canSurvive(world, pos);
 		}
 
-		private void setColumnHeightAt(BlockPos pos, int desiredHeight) {
+		private void applyColumnStateAt(BlockPos pos, int stableBlocks, int activeHeight) {
 			if (!isWithinBuildHeight(pos.getY())) {
 				return;
 			}
 
 			clearSandMassAbove(pos);
 
-			int remaining = Math.max(0, desiredHeight);
+			int remaining = Math.max(0, stableBlocks * 16 + activeHeight);
 			BlockPos.MutableBlockPos cursor = pos.mutable();
 
 			while (remaining > 0) {
@@ -300,29 +326,36 @@ public final class SandLayerAvalancheService {
 				remaining = 0;
 			}
 
-			if (desiredHeight == 0) {
+			if (remaining == 0 && stableBlocks == 0 && activeHeight == 0) {
 				world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 			}
 		}
 
-		private int readColumnHeightAt(BlockPos pos) {
-			int total = 0;
+		private ColumnState readColumnStateAt(BlockPos pos) {
+			int stableBlocks = 0;
+			int activeHeight = 0;
+			boolean sawTopLayers = false;
 			BlockPos.MutableBlockPos cursor = pos.mutable();
 			while (true) {
 				BlockState state = world.getBlockState(cursor);
 				if (state.is(Blocks.SAND)) {
-					total += 16;
+					if (sawTopLayers) {
+						activeHeight += 16;
+					} else {
+						stableBlocks++;
+					}
 					cursor.move(0, 1, 0);
 					continue;
 				}
 
 				if (state.is(DarudeBlocks.SAND_LAYER)) {
-					total += state.getValue(SandLayerBlock.LAYERS);
+					sawTopLayers = true;
+					activeHeight += state.getValue(SandLayerBlock.LAYERS);
 					cursor.move(0, 1, 0);
 					continue;
 				}
 
-				return total;
+				return new ColumnState(stableBlocks, activeHeight);
 			}
 		}
 
@@ -420,5 +453,20 @@ public final class SandLayerAvalancheService {
 		private int indexOf(int x, int z) {
 			return z * width + x;
 		}
+	}
+
+	static int normalizedStableSandBlocks(int stableBlocks, int activeHeight) {
+		return normalizeTotalLayers(stableBlocks, activeHeight) / 16;
+	}
+
+	static int normalizedActiveHeight(int stableBlocks, int activeHeight) {
+		return normalizeTotalLayers(stableBlocks, activeHeight) % 16;
+	}
+
+	private static int normalizeTotalLayers(int stableBlocks, int activeHeight) {
+		return Math.max(0, stableBlocks * 16 + activeHeight);
+	}
+
+	private record ColumnState(int stableSandBlocks, int activeHeight) {
 	}
 }
