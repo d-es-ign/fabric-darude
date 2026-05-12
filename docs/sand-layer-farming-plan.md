@@ -79,7 +79,7 @@ After successful pyramid-backed generation:
 
 ## Budgets / Safety (Current)
 
-- Global farming operation cap per tick: `max_farming_operations_per_tick`.
+- Global farming operation cap per tick: 64 operations.
 - Farming evaluation interval: `farming_tick_interval_ticks`.
 - Fall-through depth cap: `max_fallthrough_depth`.
 
@@ -93,7 +93,6 @@ After successful pyramid-backed generation:
 - `full_pyramid_erode_to_pyramid_chance`
 - `pyramid_break_chance`
 - `max_fallthrough_depth`
-- `max_farming_operations_per_tick`
 - `farming_emitters` (block tag)
 
 ## Current Defaults
@@ -106,7 +105,6 @@ After successful pyramid-backed generation:
 - `full_pyramid_erode_to_pyramid_chance = 0.005`
 - `pyramid_break_chance = 0.002`
 - `max_fallthrough_depth = 12`
-- `max_farming_operations_per_tick = 512`
 
 ## Note on V2
 

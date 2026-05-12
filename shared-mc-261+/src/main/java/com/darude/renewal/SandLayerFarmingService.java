@@ -48,6 +48,7 @@ public final class SandLayerFarmingService {
 	private static final int PLAYER_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.player_chunk_scan_radius", 4);
 	private static final int DIAGNOSTIC_CHUNK_SCAN_RADIUS = Integer.getInteger("darude.farming.diagnostic_chunk_scan_radius", 8);
 	private static final int MIN_VERTICAL_CHECKS_PER_TICK = 256;
+	private static final int MAX_FARMING_OPERATIONS_PER_TICK = 64;
 	private static final int MAX_EMITTER_DEPTH_FROM_SURFACE = Integer.getInteger("darude.farming.max_emitter_depth_from_surface", 2);
 	private static final long MAX_FARMING_WORK_NANOS = Long.getLong("darude.farming.max_work_ms", 10L) * 1_000_000L;
 	private static final boolean DEBUG_COMMANDS_ENABLED = Boolean.parseBoolean(System.getProperty("darude.debug.commands", "false"));
@@ -226,10 +227,6 @@ public final class SandLayerFarmingService {
 
 	private static void onEndWorldTick(ServerLevel world) {
 		SandLayerGenerationConfig.Values config = SandLayerGenerationConfig.get();
-		if (config.maxFarmingOperationsPerTick() <= 0) {
-			return;
-		}
-
 		long gameTime = world.getGameTime();
 		int randomTickSpeed = Math.max(1, world.getGameRules().get(GameRules.RANDOM_TICK_SPEED));
 		int effectiveIntervalTicks = Math.max(1, config.farmingTickIntervalTicks() / randomTickSpeed);
@@ -241,7 +238,7 @@ public final class SandLayerFarmingService {
 			return;
 		}
 
-		int farmingOperationLimit = resolveFarmingOperationLimit(world, config);
+		int farmingOperationLimit = resolveFarmingOperationLimit(world);
 
 		Direction windDirection = SandstormWindService.getWindDirection(world);
 		RandomSource random = world.getRandom();
@@ -329,8 +326,8 @@ public final class SandLayerFarmingService {
 		return Math.min(world.getMaxY() - 1, DEFAULT_EMITTER_MAX_Y);
 	}
 
-	private static int resolveFarmingOperationLimit(ServerLevel world, SandLayerGenerationConfig.Values config) {
-		int baseLimit = config.maxFarmingOperationsPerTick();
+	private static int resolveFarmingOperationLimit(ServerLevel world) {
+		int baseLimit = MAX_FARMING_OPERATIONS_PER_TICK;
 		if (!world.isThundering()) {
 			return baseLimit;
 		}

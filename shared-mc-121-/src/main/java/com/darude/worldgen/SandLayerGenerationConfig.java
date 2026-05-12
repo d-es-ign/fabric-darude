@@ -94,9 +94,6 @@ public final class SandLayerGenerationConfig {
 					int maxFallthroughDepth = root.has("max_fallthrough_depth")
 						? root.get("max_fallthrough_depth").getAsInt()
 						: defaults.maxFallthroughDepth();
-					int maxFarmingOperationsPerTick = root.has("max_farming_operations_per_tick")
-						? root.get("max_farming_operations_per_tick").getAsInt()
-						: defaults.maxFarmingOperationsPerTick();
 					int avalancheSlopeThreshold = root.has("avalanche_slope_threshold")
 						? root.get("avalanche_slope_threshold").getAsInt()
 						: defaults.avalancheSlopeThreshold();
@@ -125,7 +122,6 @@ public final class SandLayerGenerationConfig {
 					fullPyramidErodeToPyramidChance = clamp(fullPyramidErodeToPyramidChance, 0.0f, 1.0f);
 					pyramidBreakChance = clamp(pyramidBreakChance, 0.0f, 1.0f);
 					maxFallthroughDepth = clamp(maxFallthroughDepth, 0, 128);
-					maxFarmingOperationsPerTick = clamp(maxFarmingOperationsPerTick, 0, 4096);
 					avalancheSlopeThreshold = clamp(avalancheSlopeThreshold, 1, 15);
 					maxTopplesPerTick = clamp(maxTopplesPerTick, 0, 16384);
 					if (nearDesertMinLayers > nearDesertMaxLayers) {
@@ -152,7 +148,6 @@ public final class SandLayerGenerationConfig {
 						fullPyramidErodeToPyramidChance,
 						pyramidBreakChance,
 						maxFallthroughDepth,
-						maxFarmingOperationsPerTick,
 						avalancheSlopeThreshold,
 						maxTopplesPerTick,
 						nearDesertColumnSampleNumerator,
@@ -193,7 +188,6 @@ public final class SandLayerGenerationConfig {
 		float fullPyramidErodeToPyramidChance,
 		float pyramidBreakChance,
 		int maxFallthroughDepth,
-		int maxFarmingOperationsPerTick,
 		int avalancheSlopeThreshold,
 		int maxTopplesPerTick,
 		int nearDesertColumnSampleNumerator,
@@ -201,7 +195,7 @@ public final class SandLayerGenerationConfig {
 		String nearDesertSpawnableSupportMode
 	) {
 		public static Values defaults() {
-			return new Values(0.8f, 4, 2, 0.2f, 0, 2, 40, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 64, 3, 64, 6, 8, "full_block");
+			return new Values(0.8f, 4, 2, 0.2f, 0, 2, 40, 0.03f, 0.02f, 0.024f, 1.25f, 0.005f, 0.002f, 12, 3, 64, 6, 8, "full_block");
 		}
 	}
 }
